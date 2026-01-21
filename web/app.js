@@ -10,16 +10,16 @@
   const COURT_H = 9;
 
   const LAYOUTS = {
-    'full-h': { id: 'full-h', label: 'Intero orizz.', view: { x: -1, y: -1, w: 20, h: 11 }, rotate: false },
-    'full-v': { id: 'full-v', label: 'Intero vert.', view: { x: -1, y: -1, w: 11, h: 20 }, rotate: true },
-    'half-h': { id: 'half-h', label: 'Singolo orizz.', view: { x: -1, y: -1, w: 11, h: 11 }, rotate: false },
-    'half-v': { id: 'half-v', label: 'Singolo vert.', view: { x: -1, y: -1, w: 11, h: 11 }, rotate: true },
+    'full-h': { id: 'full-h', label: 'Intero orizz.', view: { x: -1, y: -1, w: 20, h: 11 } },
+    'full-v': { id: 'full-v', label: 'Intero vert.', view: { x: -1, y: -1, w: 11, h: 20 } },
+    'half': { id: 'half', label: 'Mezzo campo', view: { x: 0, y: 0, w: 9, h: 9 } },
   };
 
   const DEFAULT_STATE = () => ({
     version: 1,
     meta: { createdAt: new Date().toISOString() },
     layout: 'full-h',
+    rotation: 0,
     view: { x: -1, y: -1, w: 20, h: 11 }, // viewBox
     notes: '',
     layers: { players: true, ball: true, drawings: true, text: true },
@@ -118,6 +118,12 @@
       <stop offset="0%" stop-color="#121625"></stop>
       <stop offset="100%" stop-color="#0b0e19"></stop>
     </linearGradient>
+    <clipPath id="clipFull" clipPathUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="18" height="9" rx="0.4"></rect>
+    </clipPath>
+    <clipPath id="clipHalf" clipPathUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="9" height="9" rx="0.4"></rect>
+    </clipPath>
     <marker id="arrowHead" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
     </marker>
@@ -153,16 +159,14 @@
   // Court drawing
   function drawCourt() {
     gCourt.innerHTML = '';
-    const isHalf = state.layout === 'half-h' || state.layout === 'half-v';
+    const isHalf = state.layout === 'half';
     const courtW = isHalf ? COURT_W / 2 : COURT_W;
     const netX = isHalf ? courtW : COURT_W / 2;
-    const bgId = state.layout === 'full-h'
-      ? 'bgFullH'
-      : state.layout === 'full-v'
-        ? 'bgFullV'
-        : state.layout === 'half-h'
-          ? 'bgHalfH'
-          : 'bgHalfV';
+    const angle = ((state.rotation % 360) + 360) % 360;
+    const isVertical = angle === 90 || angle === 270;
+    const bgId = state.layout === 'half'
+      ? (isVertical ? 'bgHalfV' : 'bgHalfH')
+      : (isVertical ? 'bgFullV' : 'bgFullH');
     const court = (tag, attrs={}) => {
       const el = document.createElementNS(svgNS, tag);
       for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
@@ -219,7 +223,10 @@
     ensureLayoutState(layoutId);
     const ls = state.layoutStates[layoutId];
     const baseView = LAYOUTS[layoutId]?.view || LAYOUTS['full-h'].view;
-    if (!ls.view || ls.view.w > baseView.w * 1.05 || ls.view.h > baseView.h * 1.05) {
+    const isHalf = layoutId === 'half';
+    if (isHalf) {
+      ls.view = { ...baseView };
+    } else if (!ls.view || ls.view.w > baseView.w * 1.05 || ls.view.h > baseView.h * 1.05) {
       ls.view = { ...baseView };
     }
     state.view = ls.view;
@@ -240,31 +247,50 @@
     ls.ball = state.ball;
   }
 
+  function getBaseView() {
+    const isHalf = state.layout === 'half';
+    if (isHalf) return LAYOUTS['half'].view;
+    const angle = ((state.rotation % 360) + 360) % 360;
+    const isVertical = angle === 90 || angle === 270;
+    return isVertical ? LAYOUTS['full-v'].view : LAYOUTS['full-h'].view;
+  }
+
   function setViewBox(v) {
     const layout = LAYOUTS[state.layout] || LAYOUTS['full-h'];
-    const isHalf = state.layout === 'half-h' || state.layout === 'half-v';
+    const isHalf = state.layout === 'half';
+    const baseView = getBaseView();
     const nextView = isHalf ? { ...layout.view } : v;
     state.view = nextView;
     svg.setAttribute('viewBox', `${nextView.x} ${nextView.y} ${nextView.w} ${nextView.h}`);
-    const base = (LAYOUTS[state.layout] || LAYOUTS['full-h']).view.w;
-    const zoom = base / nextView.w;
+    const zoom = baseView.w / nextView.w;
     chipZoom.textContent = `Zoom: ${Math.round(zoom*100)}%`;
   }
 
   function applyLayoutTransform() {
-    const layout = LAYOUTS[state.layout] || LAYOUTS['full-h'];
-    if (layout.rotate) {
-      gRoot.setAttribute('transform', `translate(${COURT_H} 0) rotate(90)`);
+    const isHalf = state.layout === 'half';
+    const w = isHalf ? COURT_W / 2 : COURT_W;
+    const h = COURT_H;
+    const angle = ((state.rotation % 360) + 360) % 360;
+    if (angle === 90) {
+      gRoot.setAttribute('transform', `translate(${h} 0) rotate(90)`);
+    } else if (angle === 180) {
+      gRoot.setAttribute('transform', `translate(${w} ${h}) rotate(180)`);
+    } else if (angle === 270) {
+      gRoot.setAttribute('transform', `translate(0 ${w}) rotate(270)`);
     } else {
       gRoot.removeAttribute('transform');
     }
+    gRoot.setAttribute('clip-path', `url(#${isHalf ? 'clipHalf' : 'clipFull'})`);
   }
 
   function setLayout(layoutId) {
     syncLayoutState();
     const layout = LAYOUTS[layoutId] || LAYOUTS['full-h'];
     state.layout = layout.id;
+    if (layoutId === 'full-h') state.rotation = 0;
+    if (layoutId === 'full-v') state.rotation = 90;
     bindLayoutState(layout.id);
+    state.view = { ...getBaseView() };
     setViewBox({ ...state.view });
     applyLayoutTransform();
     updateLayoutTabs();
@@ -273,7 +299,8 @@
 
   function updateLayoutTabs() {
     $$('.layoutTabs .tab').forEach((btn) => {
-      const isActive = btn.getAttribute('data-layout') === state.layout;
+      const layoutId = btn.getAttribute('data-layout');
+      const isActive = layoutId ? layoutId === state.layout : false;
       btn.classList.toggle('isActive', isActive);
     });
   }
@@ -288,6 +315,11 @@
   function teamColor(teamId) {
     // Use currentColor on elements; we set style color on group/items
     return teamId === 'A' ? 'rgba(94,234,212,0.95)' : 'rgba(244,114,182,0.95)';
+  }
+
+  function currentCourtBounds() {
+    const isHalf = state.layout === 'half';
+    return { maxX: isHalf ? COURT_W / 2 : COURT_W, maxY: COURT_H };
   }
 
   function objById(id) {
@@ -680,6 +712,7 @@
   function replaceState(next) {
     state = next;
     if (!state.layout) state.layout = 'full-h';
+    if (!state.rotation && state.rotation !== 0) state.rotation = 0;
     if (!LAYOUTS[state.layout]) state.layout = 'full-h';
     if (!state.layers) state.layers = { players:true, ball:true, drawings:true, text:true };
     if (!state.layoutStates) {
@@ -702,7 +735,10 @@
 
   // Object creation
   function addPlayer(team='A', x= team==='A' ? 4 : 14, y=4.5, label='', role='X') {
-    state.objects.push({ id: ID(), type:'player', team, x, y, role, label });
+    const bounds = currentCourtBounds();
+    const clampedX = clamp(x, 0, bounds.maxX);
+    const clampedY = clamp(y, 0, bounds.maxY);
+    state.objects.push({ id: ID(), type:'player', team, x: clampedX, y: clampedY, role, label });
     commit();
   }
 
@@ -850,8 +886,11 @@
     // Add to the side closer to current selection/team if possible
     const sel = state.selection ? objById(state.selection) : null;
     const team = (sel && sel.team) ? sel.team : 'A';
-    const x = team === 'A' ? 4 : 14;
-    addPlayer(team, x, 4.5, '', 'X');
+    const bounds = currentCourtBounds();
+    const baseX = team === 'A' ? 4 : 14;
+    const x = clamp(baseX, 0, bounds.maxX);
+    const y = clamp(4.5, 0, bounds.maxY);
+    addPlayer(team, x, y, '', 'X');
   });
 
   $('#btnAddBall').addEventListener('click', () => toggleBall());
@@ -883,6 +922,7 @@
       version: state.version || 1,
       meta: state.meta || { createdAt: new Date().toISOString() },
       layout: state.layout,
+      rotation: state.rotation,
       view: ls.view,
       notes: ls.notes,
       layers: state.layers,
@@ -921,6 +961,7 @@
         ls.ball = next.ball || { id:'ball', x:9, y:4.5, visible:false };
         ls.selection = null;
         bindLayoutState(state.layout);
+        if (typeof next.rotation === 'number') state.rotation = ((next.rotation % 360) + 360) % 360;
         if (next.layers) state.layers = next.layers;
         commit();
         dlgIO.close();
@@ -944,6 +985,20 @@
       const layoutId = b.getAttribute('data-layout');
       if (layoutId) setLayout(layoutId);
     });
+  });
+  $('#btnRotateLeft').addEventListener('click', () => {
+    state.rotation = (state.rotation + 270) % 360;
+    state.view = { ...getBaseView() };
+    setViewBox({ ...state.view });
+    applyLayoutTransform();
+    commit();
+  });
+  $('#btnRotateRight').addEventListener('click', () => {
+    state.rotation = (state.rotation + 90) % 360;
+    state.view = { ...getBaseView() };
+    setViewBox({ ...state.view });
+    applyLayoutTransform();
+    commit();
   });
 
   // Default teams + empty
@@ -978,7 +1033,11 @@
     const team = addTeamSel.value || 'A';
     const role = addRoleSel.value || 'X';
     const label = (addNumberInput.value || '').trim();
-    addPlayer(team, team === 'A' ? 4 : 14, 4.5, label, role);
+    const bounds = currentCourtBounds();
+    const baseX = team === 'A' ? 4 : 14;
+    const x = clamp(baseX, 0, bounds.maxX);
+    const y = clamp(4.5, 0, bounds.maxY);
+    addPlayer(team, x, y, label, role);
     addNumberInput.value = '';
   });
 
@@ -1204,14 +1263,15 @@
       const id = drag.id;
       const dx = pt.x - drag.start.x;
       const dy = pt.y - drag.start.y;
+      const bounds = currentCourtBounds();
       if (id === 'ball') {
-        state.ball.x = clamp(drag.startObj.x + dx, 0, COURT_W);
-        state.ball.y = clamp(drag.startObj.y + dy, 0, COURT_H);
+        state.ball.x = clamp(drag.startObj.x + dx, 0, bounds.maxX);
+        state.ball.y = clamp(drag.startObj.y + dy, 0, bounds.maxY);
       } else {
         const obj = objById(id);
         if (obj) {
-          obj.x = clamp(drag.startObj.x + dx, 0, COURT_W);
-          obj.y = clamp(drag.startObj.y + dy, 0, COURT_H);
+          obj.x = clamp(drag.startObj.x + dx, 0, bounds.maxX);
+          obj.y = clamp(drag.startObj.y + dy, 0, bounds.maxY);
         }
       }
       render();

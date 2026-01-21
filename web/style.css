@@ -74,6 +74,11 @@ body{
   flex-wrap:wrap;
   margin-bottom:10px;
 }
+.tabGroup{
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
 .tab{
   background:linear-gradient(180deg,var(--btn2),var(--btn));
   border:1px solid rgba(255,255,255,.08);
@@ -84,10 +89,32 @@ body{
   font-size:12px;
   letter-spacing:.2px;
 }
+.tabSmall{
+  padding:6px 9px;
+  font-size:11px;
+}
 .tab.isActive{
   border-color: rgba(94,234,212,.35);
   box-shadow: 0 8px 18px rgba(94,234,212,.18);
 }
+.rotateBtn{
+  position:absolute;
+  top:50%;
+  transform: translateY(-50%);
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(17,20,26,.75);
+  color:var(--text);
+  cursor:pointer;
+  z-index:6;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+.rotateBtn:active{transform: translateY(-50%) scale(0.98)}
+.rotateLeft{left:12px}
+.rotateRight{right:12px}
 .stage{
   width:100%;
   height:100%;
