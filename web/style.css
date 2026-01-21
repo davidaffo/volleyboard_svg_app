@@ -56,10 +56,77 @@ body{
 .btnDanger{border-color: rgba(239,68,68,.25)}
 .main{
   display:grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 220px 1fr 320px;
   gap:var(--gap);
   padding:var(--gap);
   height: calc(100% - 58px);
+}
+.toolbox{
+  display:flex;
+  flex-direction:column;
+  gap:var(--gap);
+  height:100%;
+  min-width:0;
+}
+.toolboxPanel{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  height:100%;
+}
+.toolGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap:6px;
+  overflow:auto;
+  max-height:100%;
+  padding-right:2px;
+}
+.toolBtn{
+  background:linear-gradient(180deg,var(--btn2),var(--btn));
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--text);
+  border-radius:14px;
+  aspect-ratio: 1 / 1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  cursor:grab;
+  box-shadow: 0 8px 18px rgba(0,0,0,.25);
+  user-select:none;
+}
+.toolBtn:active{transform: translateY(1px)}
+.toolIcon{
+  font-weight:800;
+  font-size:14px;
+  letter-spacing:.2px;
+}
+.toolPreview{
+  width:46px;
+  height:46px;
+  display:block;
+}
+.toolLabel{
+  font-size:11px;
+  color:var(--muted);
+  text-align:center;
+  padding:0 6px;
+}
+.toolLabel{
+  font-size:11px;
+  color:var(--muted);
+  text-align:center;
+  padding:0 6px;
+}
+.toolSwatch{
+  width:18px;
+  height:16px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  border-radius:2px;
+  background: var(--swatch, #f97316);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.25);
 }
 .stageWrap{
   position:relative;

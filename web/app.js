@@ -9,6 +9,9 @@
   const COURT_W = 18;
   const COURT_H = 9;
 
+  const defaultRotationFor = (layoutId) => (layoutId === 'full-v' ? 90 : (layoutId === 'half' ? 270 : 0));
+
+
   const LAYOUTS = {
     'full-h': { id: 'full-h', label: 'Campo intero', view: { x: -1, y: -1, w: 20, h: 11 } },
     'full-v': { id: 'full-v', label: 'Campo intero (vert.)', view: { x: -1, y: -1, w: 11, h: 20 } },
@@ -26,6 +29,7 @@
     objects: [], // {id,type,team,x,y,role,label,style,...}
     drawings: [], // {id,type,path,team,style}
     texts: [], // {id,type,x,y,text,team,style}
+    props: [], // {id,type,kind,x,y,role,color}
     ball: { id: 'ball', x: 9, y: 4.5, visible: false },
     selection: null,
   });
@@ -45,6 +49,24 @@
     { id: 'S2', name: 'Schiacciatore 2 (S2)' },
     { id: 'C1', name: 'Centrale 1 (C1)' },
     { id: 'X', name: 'Altro (X)' },
+  ];
+
+  const TOOLBOX_ITEMS = [
+    { id:'role-P', label:'P', kind:'player', role:'P' },
+    { id:'role-S1', label:'S1', kind:'player', role:'S1' },
+    { id:'role-C2', label:'C2', kind:'player', role:'C2' },
+    { id:'role-O', label:'O', kind:'player', role:'O' },
+    { id:'role-S2', label:'S2', kind:'player', role:'S2' },
+    { id:'role-C1', label:'C1', kind:'player', role:'C1' },
+    { id:'cone-red', label:'Cinesino rosso', kind:'cone', color:'#ef4444' },
+    { id:'cone-yellow', label:'Cinesino giallo', kind:'cone', color:'#f59e0b' },
+    { id:'cone-blue', label:'Cinesino blu', kind:'cone', color:'#3b82f6' },
+    { id:'cone-green', label:'Cinesino verde', kind:'cone', color:'#10b981' },
+    { id:'ball-cart', label:'Carrello palloni', kind:'ball-cart' },
+    { id:'basket', label:'Canestro', kind:'basket' },
+    { id:'coach', label:'Allenatore', kind:'coach' },
+    { id:'ladder', label:'Scaletta', kind:'ladder' },
+    { id:'target', label:'Bersaglio', kind:'target' },
   ];
 
   // Undo/redo
@@ -77,6 +99,7 @@
   };
 
   let state = DEFAULT_STATE();
+  let halfInitialized = false;
   state.layoutStates = {};
   ensureLayoutState(state.layout);
   bindLayoutState(state.layout);
@@ -90,6 +113,7 @@
   const statObjects = $('#statObjects');
   const chipMode = $('#chipMode');
   const chipZoom = $('#chipZoom');
+  const toolGrid = $('#toolGrid');
 
   // Build SVG
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -135,6 +159,7 @@
   const gScene = document.createElementNS(svgNS, 'g');
   const gCourt = document.createElementNS(svgNS, 'g');
   const gDrawings = document.createElementNS(svgNS, 'g');
+  const gProps = document.createElementNS(svgNS, 'g');
   const gPlayers = document.createElementNS(svgNS, 'g');
   const gBall = document.createElementNS(svgNS, 'g');
   const gText = document.createElementNS(svgNS, 'g');
@@ -143,6 +168,7 @@
   gScene.setAttribute('id', 'scene');
   gCourt.setAttribute('id', 'court');
   gDrawings.setAttribute('id', 'drawings');
+  gProps.setAttribute('id', 'props');
   gPlayers.setAttribute('id', 'players');
   gBall.setAttribute('id', 'ballLayer');
   gText.setAttribute('id', 'textLayer');
@@ -151,6 +177,7 @@
   gRoot.appendChild(gScene);
   gScene.appendChild(gCourt);
   gScene.appendChild(gDrawings);
+  gScene.appendChild(gProps);
   gScene.appendChild(gPlayers);
   gScene.appendChild(gBall);
   gScene.appendChild(gText);
@@ -201,12 +228,15 @@
 
   function defaultLayoutState(layoutId) {
     const baseView = LAYOUTS[layoutId]?.view || LAYOUTS['full-h'].view;
+    const defaultRotation = defaultRotationFor(layoutId);
     return {
       view: { ...baseView },
+      rotation: defaultRotation,
       notes: '',
       objects: [],
       drawings: [],
       texts: [],
+      props: [],
       ball: { id: 'ball', x: 9, y: 4.5, visible: false },
       selection: null,
     };
@@ -218,6 +248,10 @@
     if (!state.layoutStates[layoutId].view) {
       state.layoutStates[layoutId].view = { ...(LAYOUTS[layoutId]?.view || LAYOUTS['full-h'].view) };
     }
+    if (typeof state.layoutStates[layoutId].rotation !== 'number') {
+      state.layoutStates[layoutId].rotation = defaultRotationFor(layoutId);
+    }
+    if (!state.layoutStates[layoutId].props) state.layoutStates[layoutId].props = [];
   }
 
   function bindLayoutState(layoutId) {
@@ -231,10 +265,12 @@
       ls.view = { ...baseView };
     }
     state.view = ls.view;
+    if (typeof ls.rotation === 'number') state.rotation = ls.rotation;
     state.notes = ls.notes || '';
     state.objects = ls.objects || [];
     state.drawings = ls.drawings || [];
     state.texts = ls.texts || [];
+    state.props = ls.props || [];
     state.ball = ls.ball || { id:'ball', x:9, y:4.5, visible:false };
     state.selection = ls.selection || null;
   }
@@ -243,9 +279,11 @@
     const ls = state.layoutStates?.[state.layout];
     if (!ls) return;
     ls.view = state.view;
+    ls.rotation = state.rotation;
     ls.notes = state.notes || '';
     ls.selection = state.selection || null;
     ls.ball = state.ball;
+    ls.props = state.props || [];
   }
 
   function getBaseView() {
@@ -288,8 +326,10 @@
     syncLayoutState();
     const layout = LAYOUTS[layoutId] || LAYOUTS['full-h'];
     state.layout = layout.id;
-    if (layoutId === 'full-h') state.rotation = 0;
-    if (layoutId === 'full-v') state.rotation = 90;
+    if (layoutId === 'half' && !halfInitialized) {
+      state.layoutStates[layoutId] = defaultLayoutState(layoutId);
+      halfInitialized = true;
+    }
     bindLayoutState(layout.id);
     state.view = { ...getBaseView() };
     setViewBox({ ...state.view });
@@ -328,7 +368,8 @@
     if (id === 'ball') return state.ball;
     return state.objects.find(o => o.id === id)
       || state.drawings.find(d => d.id === id)
-      || state.texts.find(t => t.id === id);
+      || state.texts.find(t => t.id === id)
+      || state.props.find(p => p.id === id);
   }
 
   function setSelection(id) {
@@ -444,6 +485,78 @@
       }
 
       gPlayers.appendChild(g);
+    }
+  }
+
+  function drawPropShape(g, p) {
+    const add = (tag, attrs={}) => {
+      const el = document.createElementNS(svgNS, tag);
+      for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+      g.appendChild(el);
+      return el;
+    };
+
+    if (p.kind === 'player') {
+      add('circle', { cx:0, cy:0, r:0.32, fill:'rgba(94,234,212,0.9)', stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
+      add('circle', { cx:-0.1, cy:-0.1, r:0.05, fill:'rgba(255,255,255,0.25)' });
+    } else if (p.kind === 'role') {
+      add('rect', { x:-0.5, y:-0.25, width:1.0, height:0.5, rx:0.12, fill:'rgba(12,16,22,0.75)', stroke:'rgba(255,255,255,0.2)', 'stroke-width':0.04 });
+      add('rect', { x:-0.32, y:-0.08, width:0.64, height:0.16, rx:0.06, fill:'rgba(255,255,255,0.12)' });
+      add('circle', { cx:-0.22, cy:0.08, r:0.04, fill:'rgba(255,255,255,0.35)' });
+      add('circle', { cx:0.0, cy:0.08, r:0.04, fill:'rgba(255,255,255,0.35)' });
+      add('circle', { cx:0.22, cy:0.08, r:0.04, fill:'rgba(255,255,255,0.35)' });
+    } else if (p.kind === 'cone') {
+      const color = p.color || '#f97316';
+      add('polygon', { points:'0,-0.35 0.38,0.28 -0.38,0.28', fill: color, stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
+      add('rect', { x:-0.35, y:0.22, width:0.7, height:0.12, rx:0.04, fill:'rgba(0,0,0,0.25)' });
+    } else if (p.kind === 'ball-cart') {
+      add('rect', { x:-0.45, y:-0.25, width:0.9, height:0.5, rx:0.1, fill:'rgba(15,20,28,0.9)', stroke:'rgba(255,255,255,0.2)', 'stroke-width':0.04 });
+      add('circle', { cx:-0.25, cy:0.32, r:0.07, fill:'rgba(255,255,255,0.7)' });
+      add('circle', { cx:0.25, cy:0.32, r:0.07, fill:'rgba(255,255,255,0.7)' });
+      add('circle', { cx:-0.18, cy:-0.05, r:0.12, fill:'rgba(255,255,255,0.9)' });
+      add('circle', { cx:0.1, cy:-0.03, r:0.12, fill:'rgba(255,255,255,0.9)' });
+    } else if (p.kind === 'basket') {
+      add('rect', { x:-0.45, y:-0.3, width:0.9, height:0.55, rx:0.08, fill:'rgba(18,22,30,0.9)', stroke:'rgba(255,255,255,0.2)', 'stroke-width':0.04 });
+      add('circle', { cx:0, cy:-0.05, r:0.16, fill:'none', stroke:'rgba(244,114,182,0.9)', 'stroke-width':0.06 });
+      add('rect', { x:-0.2, y:0.1, width:0.4, height:0.12, rx:0.04, fill:'rgba(244,114,182,0.35)' });
+    } else if (p.kind === 'coach') {
+      add('circle', { cx:0, cy:-0.2, r:0.16, fill:'rgba(255,255,255,0.9)' });
+      add('rect', { x:-0.22, y:-0.05, width:0.44, height:0.4, rx:0.12, fill:'rgba(94,234,212,0.9)' });
+      add('rect', { x:-0.08, y:0.04, width:0.16, height:0.26, rx:0.03, fill:'rgba(255,255,255,0.95)' });
+      add('rect', { x:-0.16, y:0.04, width:0.32, height:0.06, rx:0.03, fill:'rgba(255,255,255,0.95)' });
+    } else if (p.kind === 'ladder') {
+      add('rect', { x:-0.5, y:-0.25, width:1.0, height:0.5, rx:0.08, fill:'rgba(0,0,0,0.0)', stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
+      add('line', { x1:-0.35, y1:-0.15, x2:0.35, y2:-0.15, stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
+      add('line', { x1:-0.35, y1:0.0, x2:0.35, y2:0.0, stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
+      add('line', { x1:-0.35, y1:0.15, x2:0.35, y2:0.15, stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
+    } else if (p.kind === 'target') {
+      add('circle', { cx:0, cy:0, r:0.28, fill:'none', stroke:'rgba(255,255,255,0.4)', 'stroke-width':0.04 });
+      add('circle', { cx:0, cy:0, r:0.14, fill:'rgba(255,255,255,0.2)' });
+    }
+  }
+
+  function renderProps() {
+    gProps.innerHTML = '';
+    for (const p of state.props) {
+      const g = document.createElementNS(svgNS, 'g');
+      g.setAttribute('data-id', p.id);
+      g.setAttribute('transform', `translate(${p.x} ${p.y})`);
+      g.style.cursor = 'grab';
+      g.setAttribute('transform', `translate(${p.x} ${p.y})`);
+      drawPropShape(g, p);
+
+      if (state.selection === p.id) {
+        const sel = document.createElementNS(svgNS, 'circle');
+        sel.setAttribute('cx', '0');
+        sel.setAttribute('cy', '0');
+        sel.setAttribute('r', '0.6');
+        sel.setAttribute('fill', 'none');
+        sel.setAttribute('stroke', 'rgba(255,255,255,0.6)');
+        sel.setAttribute('stroke-width', '0.05');
+        g.appendChild(sel);
+      }
+
+      gProps.appendChild(g);
     }
   }
 
@@ -709,7 +822,7 @@
   }
 
   function renderStats() {
-    statObjects.textContent = String(state.objects.length + state.drawings.length + state.texts.length + (state.ball.visible?1:0));
+    statObjects.textContent = String(state.objects.length + state.drawings.length + state.texts.length + state.props.length + (state.ball.visible?1:0));
   }
 
   function render() {
@@ -720,6 +833,7 @@
     updateLayoutTabs();
     renderCourtSelectionHint();
     renderDrawings();
+    renderProps();
     renderPlayers();
     renderBall();
     renderTexts();
@@ -750,10 +864,12 @@
       state.layoutStates = {};
       state.layoutStates[state.layout] = {
         view: state.view || { ...(LAYOUTS[state.layout]?.view || LAYOUTS['full-h'].view) },
+        rotation: typeof state.rotation === 'number' ? state.rotation : defaultRotationFor(state.layout),
         notes: state.notes || '',
         objects: state.objects || [],
         drawings: state.drawings || [],
         texts: state.texts || [],
+        props: state.props || [],
         ball: state.ball || { id:'ball', x:9, y:4.5, visible:false },
         selection: state.selection || null,
       };
@@ -791,8 +907,86 @@
     state.objects = state.objects.filter(o => o.id !== id);
     state.drawings = state.drawings.filter(d => d.id !== id);
     state.texts = state.texts.filter(t => t.id !== id);
+    state.props = state.props.filter(p => p.id !== id);
     state.selection = null;
     commit();
+  }
+
+  function addProp(kind, x, y, opts = {}) {
+    const bounds = currentCourtBounds();
+    const clampedX = clamp(x, 0, bounds.maxX);
+    const clampedY = clamp(y, 0, bounds.maxY);
+    state.props.push({ id: ID(), type:'prop', kind, x: clampedX, y: clampedY, role: opts.role, color: opts.color });
+    commit();
+  }
+
+  function addPlayerFromTool(role, x, y) {
+    const sel = state.selection ? objById(state.selection) : null;
+    const team = (sel && sel.team) ? sel.team : 'A';
+    addPlayer(team, x, y, '', role || 'X');
+  }
+
+  function renderToolbox() {
+    if (!toolGrid) return;
+    toolGrid.innerHTML = '';
+    const iconFor = (item) => {
+      if (item.kind === 'role') return item.role || 'R';
+      if (item.kind === 'ball-cart') return 'CP';
+      if (item.kind === 'basket') return 'CAN';
+      if (item.kind === 'coach') return 'ALL';
+      if (item.kind === 'assistant') return 'ASS';
+      if (item.kind === 'ladder') return 'SCL';
+      if (item.kind === 'target') return 'BRG';
+      return item.label.slice(0, 2).toUpperCase();
+    };
+
+    for (const item of TOOLBOX_ITEMS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'toolBtn';
+      b.setAttribute('draggable', 'true');
+      b.dataset.kind = item.kind;
+      if (item.role) b.dataset.role = item.role;
+      if (item.color) b.dataset.color = item.color;
+
+      const preview = document.createElementNS(svgNS, 'svg');
+      preview.setAttribute('class', 'toolPreview');
+      preview.setAttribute('viewBox', '-1 -1 2 2');
+      const g = document.createElementNS(svgNS, 'g');
+      const p = { kind: item.kind, role: item.role, color: item.color };
+      g.setAttribute('transform', 'scale(1.1)');
+      drawPropShape(g, p);
+      preview.appendChild(g);
+
+      const label = document.createElement('span');
+      label.className = 'toolLabel';
+      label.textContent = item.label;
+
+      b.appendChild(preview);
+      b.appendChild(label);
+
+      b.addEventListener('click', () => {
+        const v = state.view;
+        const cx = v.x + v.w / 2;
+        const cy = v.y + v.h / 2;
+        if (item.kind === 'player') {
+          addPlayerFromTool(item.role, cx, cy);
+        } else {
+          addProp(item.kind, cx, cy, { role: item.role, color: item.color });
+        }
+      });
+
+      b.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('application/json', JSON.stringify({
+          kind: item.kind,
+          role: item.role || '',
+          color: item.color || '',
+        }));
+      });
+
+      toolGrid.appendChild(b);
+    }
   }
 
   // Presets
@@ -800,6 +994,7 @@
     state.objects = [];
     state.drawings = [];
     state.texts = [];
+    state.props = [];
     state.ball = { id:'ball', x:9, y:4.5, visible:false };
     state.selection = null;
     commit();
@@ -939,6 +1134,7 @@
       objects: ls.objects,
       drawings: ls.drawings,
       texts: ls.texts,
+      props: ls.props,
       ball: ls.ball,
     };
     ioText.value = JSON.stringify(payload, null, 2);
@@ -968,10 +1164,14 @@
         ls.objects = Array.isArray(next.objects) ? next.objects : [];
         ls.drawings = Array.isArray(next.drawings) ? next.drawings : [];
         ls.texts = Array.isArray(next.texts) ? next.texts : [];
+        ls.props = Array.isArray(next.props) ? next.props : [];
         ls.ball = next.ball || { id:'ball', x:9, y:4.5, visible:false };
         ls.selection = null;
         bindLayoutState(state.layout);
-        if (typeof next.rotation === 'number') state.rotation = ((next.rotation % 360) + 360) % 360;
+        if (typeof next.rotation === 'number') {
+          state.rotation = ((next.rotation % 360) + 360) % 360;
+          ls.rotation = state.rotation;
+        }
         if (next.layers) state.layers = next.layers;
         commit();
         dlgIO.close();
@@ -1087,6 +1287,9 @@
         if (t !== null) { sel.text = t; commit(); }
       }, 'btn');
       add('Cambia squadra', () => { sel.team = sel.team === 'A' ? 'B' : 'A'; commit(); }, 'btn');
+      add('Elimina', () => removeSelected(), 'btn btnDanger');
+    } else if (sel.type === 'prop') {
+      add('Duplica', () => { state.props.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
       add('Elimina', () => removeSelected(), 'btn btnDanger');
     } else if (sel.id === 'ball') {
       add(state.ball.visible ? 'Nascondi palla' : 'Mostra palla', () => { state.ball.visible = !state.ball.visible; commit(); }, 'btn');
@@ -1232,7 +1435,7 @@
       // start drag
       if (targetId === 'ball') {
         drag = { type:'move', id:'ball', start: pt, startObj: { x: state.ball.x, y: state.ball.y } };
-      } else if (obj.type === 'player' || obj.type === 'text') {
+      } else if (obj.type === 'player' || obj.type === 'text' || obj.type === 'prop') {
         drag = { type:'move', id: targetId, start: pt, startObj: { x: obj.x, y: obj.y } };
       }
       return;
@@ -1322,6 +1525,25 @@
     }
   });
 
+  svg.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  svg.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('application/json');
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw);
+      const pt = svgPointFromClient(e.clientX, e.clientY);
+      if (data.kind === 'player') {
+        addPlayerFromTool(data.role, pt.x, pt.y);
+      } else {
+        addProp(data.kind, pt.x, pt.y, { role: data.role, color: data.color });
+      }
+    } catch {}
+  });
+
   svg.addEventListener('pointercancel', () => {
     cancelLongPress();
     arrowDraft = null;
@@ -1388,6 +1610,11 @@
     if (id) setSelection(id);
   }, true);
 
+  gProps.addEventListener('pointerdown', (e) => {
+    const id = hitTestTarget(e.target);
+    if (id) setSelection(id);
+  }, true);
+
   gText.addEventListener('pointerdown', (e) => {
     const id = hitTestTarget(e.target);
     if (id) setSelection(id);
@@ -1409,9 +1636,24 @@
   window.addEventListener('beforeunload', saveLocal);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveLocal(); });
 
+  function resetLayoutRotationsToDefaults() {
+    if (!state.layoutStates) return;
+    for (const id of Object.keys(state.layoutStates)) {
+      state.layoutStates[id].rotation = defaultRotationFor(id);
+    }
+    state.rotation = state.layoutStates[state.layout]?.rotation ?? defaultRotationFor(state.layout);
+  }
+
   // Selection / delete with long press via menu
   // Auto-load state
-  if (!loadLocal()) render();
+  renderToolbox();
+  const loaded = loadLocal();
+  if (loaded) {
+    resetLayoutRotationsToDefaults();
+    render();
+  } else {
+    render();
+  }
   updateLayoutTabs();
 
   // Auto commit after first render to have baseline
