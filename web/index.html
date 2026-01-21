@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#111111" />
   <title>VolleyBoard SVG</title>
   <link rel="manifest" href="./manifest.webmanifest" />
@@ -30,7 +30,19 @@
 
   <main class="main">
     <section class="stageWrap">
+      <div class="layoutTabs" id="layoutTabs" role="tablist">
+        <button class="tab isActive" data-layout="full-h" role="tab">Intero orizz.</button>
+        <button class="tab" data-layout="full-v" role="tab">Intero vert.</button>
+        <button class="tab" data-layout="half-h" role="tab">Singolo orizz.</button>
+        <button class="tab" data-layout="half-v" role="tab">Singolo vert.</button>
+      </div>
       <div class="stage" id="stage"></div>
+      <div class="inspectorOverlay" id="inspectorOverlay">
+        <div class="overlayHeader" id="inspectorHandle">Oggetto selezionato</div>
+        <div id="inspector" class="inspector">
+          <div class="muted">Nessuna selezione</div>
+        </div>
+      </div>
       <div class="hud" id="hud">
         <div class="hudRow">
           <span class="chip" id="chipMode">Modalità: Selezione</span>
@@ -44,19 +56,24 @@
 
     <aside class="side">
       <div class="panel">
-        <div class="panelTitle">Oggetto selezionato</div>
-        <div id="inspector" class="inspector">
-          <div class="muted">Nessuna selezione</div>
+        <div class="panelTitle">Aggiungi giocatore per ruolo</div>
+        <div class="formGrid">
+          <div class="label">Squadra</div>
+          <select id="addTeam"></select>
+          <div class="label">Ruolo</div>
+          <select id="addRole"></select>
+          <div class="label">Numero</div>
+          <input id="addNumber" type="text" placeholder="Es. 7" />
+          <button id="btnAddRolePlayer" class="btn btnPrimary full">Aggiungi</button>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panelTitle">Preset rapidi</div>
+        <div class="panelTitle">Squadre di default</div>
         <div class="presetGrid">
-          <button class="btn" data-preset="6v6">6 vs 6</button>
-          <button class="btn" data-preset="3v3">3 vs 3</button>
-          <button class="btn" data-preset="sideout">Sideout</button>
-          <button class="btn" data-preset="breakpoint">Breakpoint</button>
+          <button class="btn" data-preset="teamA">Solo squadra A</button>
+          <button class="btn" data-preset="teamB">Solo squadra B</button>
+          <button class="btn" data-preset="teams">A + B (6 vs 6)</button>
           <button class="btn" data-preset="empty">Campo vuoto</button>
         </div>
       </div>

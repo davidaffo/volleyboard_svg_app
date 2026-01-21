@@ -158,7 +158,7 @@ function DEFAULT_STATE(){
     objects: [],
     drawings: [],
     texts: [],
-    ball: { id: 'ball', x: 9, y: 4.5, visible: true },
+    ball: { id: 'ball', x: 9, y: 4.5, visible: false },
     selection: null,
     mode: MODE.SELECT,
   };
@@ -185,10 +185,6 @@ function mountVolleyBoard(root, initialState, onSave) {
     <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
       <feDropShadow dx="0" dy="0.35" stdDeviation="0.35" flood-color="rgba(0,0,0,.55)"/>
     </filter>
-    <symbol id="playerSymbol" viewBox="-0.6 -0.6 1.2 1.2">
-      <circle cx="0" cy="0" r="0.5" fill="currentColor"></circle>
-      <circle cx="-0.18" cy="-0.18" r="0.08" fill="rgba(255,255,255,.25)"></circle>
-    </symbol>
   `;
   svg.appendChild(defs);
 
@@ -209,7 +205,7 @@ function mountVolleyBoard(root, initialState, onSave) {
     if (!Array.isArray(s.objects)) s.objects = [];
     if (!Array.isArray(s.drawings)) s.drawings = [];
     if (!Array.isArray(s.texts)) s.texts = [];
-    if (!s.ball) s.ball = {id:'ball',x:9,y:4.5,visible:true};
+    if (!s.ball) s.ball = {id:'ball',x:9,y:4.5,visible:false};
     if (!('mode' in s)) s.mode = MODE.SELECT;
     return s;
   }
@@ -257,8 +253,8 @@ function mountVolleyBoard(root, initialState, onSave) {
     add('rect', { x:0, y:0, width:COURT_W, height:COURT_H, fill:'none', stroke:'rgba(255,255,255,0.20)', 'stroke-width':0.08 });
     add('line', { x1:COURT_W/2, y1:0, x2:COURT_W/2, y2:COURT_H, stroke:'rgba(255,255,255,0.20)', 'stroke-width':0.08 });
     add('rect', { x:COURT_W/2 - 0.06, y:0, width:0.12, height:COURT_H, fill:'rgba(94,234,212,0.10)' });
-    add('line', { x1:3, y1:0, x2:3, y2:COURT_H, stroke:'rgba(255,255,255,0.14)', 'stroke-width':0.06, 'stroke-dasharray':'0.25 0.25' });
-    add('line', { x1:COURT_W-3, y1:0, x2:COURT_W-3, y2:COURT_H, stroke:'rgba(255,255,255,0.14)', 'stroke-width':0.06, 'stroke-dasharray':'0.25 0.25' });
+    add('line', { x1:COURT_W/2 - 3, y1:0, x2:COURT_W/2 - 3, y2:COURT_H, stroke:'rgba(255,255,255,0.14)', 'stroke-width':0.06, 'stroke-dasharray':'0.25 0.25' });
+    add('line', { x1:COURT_W/2 + 3, y1:0, x2:COURT_W/2 + 3, y2:COURT_H, stroke:'rgba(255,255,255,0.14)', 'stroke-width':0.06, 'stroke-dasharray':'0.25 0.25' });
   }
 
   function renderPlayers(){
@@ -272,26 +268,38 @@ function mountVolleyBoard(root, initialState, onSave) {
       g.style.color = teamColor(o.team || 'A');
       g.style.cursor = 'grab';
 
-      const use = document.createElementNS(svgNS, 'use');
-      use.setAttribute('href', '#playerSymbol');
-      use.setAttribute('filter', 'url(#softShadow)');
-      g.appendChild(use);
+      const base = document.createElementNS(svgNS, 'circle');
+      base.setAttribute('cx', '0'); base.setAttribute('cy', '0');
+      base.setAttribute('r', '0.3');
+      base.setAttribute('fill', 'currentColor');
+      base.setAttribute('filter', 'url(#softShadow)');
+      g.appendChild(base);
+
+      const highlight = document.createElementNS(svgNS, 'circle');
+      highlight.setAttribute('cx', '-0.1'); highlight.setAttribute('cy', '-0.1');
+      highlight.setAttribute('r', '0.045');
+      highlight.setAttribute('fill', 'rgba(255,255,255,.25)');
+      g.appendChild(highlight);
 
       const txt = document.createElementNS(svgNS, 'text');
-      txt.setAttribute('x', '0'); txt.setAttribute('y', '0.16');
+      txt.setAttribute('x', '0'); txt.setAttribute('y', '-0.06');
       txt.setAttribute('text-anchor', 'middle');
-      txt.setAttribute('font-size', '0.38');
-      txt.setAttribute('fill', 'rgba(0,0,0,0.75)');
+      txt.setAttribute('font-size', '0.23');
+      txt.setAttribute('fill', 'rgba(255,255,255,0.96)');
+      txt.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+      txt.setAttribute('stroke-width', '0.03');
+      txt.setAttribute('paint-order', 'stroke');
+      txt.setAttribute('font-weight', '700');
       txt.style.pointerEvents = 'none';
       txt.textContent = o.label || '';
       g.appendChild(txt);
 
       if (state.selection === o.id) {
         const sel = document.createElementNS(svgNS, 'circle');
-        sel.setAttribute('cx','0'); sel.setAttribute('cy','0'); sel.setAttribute('r','0.62');
+        sel.setAttribute('cx','0'); sel.setAttribute('cy','0'); sel.setAttribute('r','0.4');
         sel.setAttribute('fill','none'); sel.setAttribute('stroke','rgba(255,255,255,0.65)'); sel.setAttribute('stroke-width','0.06');
         sel.style.pointerEvents = 'none';
-        g.insertBefore(sel, use);
+        g.insertBefore(sel, base);
       }
       gPlayers.appendChild(g);
     }
@@ -306,12 +314,32 @@ function mountVolleyBoard(root, initialState, onSave) {
     g.setAttribute('transform', `translate(${state.ball.x} ${state.ball.y})`);
     g.style.cursor = 'grab';
     const c = document.createElementNS(svgNS, 'circle');
-    c.setAttribute('cx','0'); c.setAttribute('cy','0'); c.setAttribute('r','0.22');
-    c.setAttribute('fill','rgba(255,255,255,0.85)');
-    c.setAttribute('stroke','rgba(0,0,0,0.35)');
+    c.setAttribute('cx','0'); c.setAttribute('cy','0'); c.setAttribute('r','0.28');
+    c.setAttribute('fill','#f7f1e5');
+    c.setAttribute('stroke','#cbb48e');
     c.setAttribute('stroke-width','0.04');
     c.setAttribute('filter','url(#softShadow)');
     g.appendChild(c);
+
+    const highlight = document.createElementNS(svgNS, 'circle');
+    highlight.setAttribute('cx','-0.12'); highlight.setAttribute('cy','-0.12'); highlight.setAttribute('r','0.08');
+    highlight.setAttribute('fill','rgba(255,255,255,0.5)');
+    g.appendChild(highlight);
+
+    const seams = [
+      'M -0.2 -0.1 C -0.05 -0.22 0.1 -0.2 0.2 -0.06',
+      'M -0.2 0.12 C -0.04 0.0 0.12 0.0 0.2 0.14',
+      'M -0.06 -0.24 C 0.04 -0.1 0.04 0.1 -0.04 0.24',
+    ];
+    for (const d of seams) {
+      const s = document.createElementNS(svgNS, 'path');
+      s.setAttribute('d', d);
+      s.setAttribute('fill', 'none');
+      s.setAttribute('stroke', '#d9c7a7');
+      s.setAttribute('stroke-width', '0.035');
+      s.setAttribute('stroke-linecap', 'round');
+      g.appendChild(s);
+    }
     if (state.selection === 'ball') {
       const sel = document.createElementNS(svgNS, 'circle');
       sel.setAttribute('cx','0'); sel.setAttribute('cy','0'); sel.setAttribute('r','0.36');

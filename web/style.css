@@ -61,16 +61,66 @@ body{
   padding:var(--gap);
   height: calc(100% - 58px);
 }
-.stageWrap{position:relative; min-width:0}
+.stageWrap{
+  position:relative;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.layoutTabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+.tab{
+  background:linear-gradient(180deg,var(--btn2),var(--btn));
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--text);
+  padding:7px 10px;
+  border-radius:999px;
+  cursor:pointer;
+  font-size:12px;
+  letter-spacing:.2px;
+}
+.tab.isActive{
+  border-color: rgba(94,234,212,.35);
+  box-shadow: 0 8px 18px rgba(94,234,212,.18);
+}
 .stage{
   width:100%;
   height:100%;
+  flex:1;
   background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
   border:1px solid rgba(255,255,255,.07);
   border-radius: var(--radius2);
   box-shadow: var(--shadow);
   overflow:hidden;
   position:relative;
+  touch-action:none;
+  overscroll-behavior: none;
+}
+.stage svg{touch-action:none}
+.inspectorOverlay{
+  position:absolute;
+  top:16px;
+  right:16px;
+  width:min(280px, calc(100% - 32px));
+  background: rgba(17,20,26,.85);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding:10px;
+  z-index:5;
+  backdrop-filter: blur(10px);
+}
+.overlayHeader{
+  font-weight:700;
+  margin-bottom:8px;
+  cursor:move;
+  user-select:none;
+  touch-action:none;
 }
 .hud{
   position:absolute;
@@ -128,9 +178,23 @@ body{
   padding:8px 10px;
   border-radius:12px;
   outline:none;
+  font-size:16px;
 }
 .muted{color:var(--muted); font-size:13px}
 .presetGrid{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.formGrid{display:grid; grid-template-columns: 96px 1fr; gap:8px; align-items:center}
+.formGrid .label{color:var(--muted); font-size:12px}
+.formGrid input,.formGrid select{
+  width:100%;
+  background: rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.10);
+  color:var(--text);
+  padding:8px 10px;
+  border-radius:12px;
+  outline:none;
+  font-size:16px;
+}
+.formGrid .full{grid-column:1/-1}
 .notes{
   width:100%;
   min-height:120px;

@@ -9,16 +9,24 @@
   const COURT_W = 18;
   const COURT_H = 9;
 
+  const LAYOUTS = {
+    'full-h': { id: 'full-h', label: 'Intero orizz.', view: { x: -1, y: -1, w: 20, h: 11 }, rotate: false },
+    'full-v': { id: 'full-v', label: 'Intero vert.', view: { x: -1, y: -1, w: 11, h: 20 }, rotate: true },
+    'half-h': { id: 'half-h', label: 'Singolo orizz.', view: { x: -1, y: -1, w: 11, h: 11 }, rotate: false },
+    'half-v': { id: 'half-v', label: 'Singolo vert.', view: { x: -1, y: -1, w: 11, h: 11 }, rotate: true },
+  };
+
   const DEFAULT_STATE = () => ({
     version: 1,
     meta: { createdAt: new Date().toISOString() },
+    layout: 'full-h',
     view: { x: -1, y: -1, w: 20, h: 11 }, // viewBox
     notes: '',
     layers: { players: true, ball: true, drawings: true, text: true },
     objects: [], // {id,type,team,x,y,role,label,style,...}
     drawings: [], // {id,type,path,team,style}
     texts: [], // {id,type,x,y,text,team,style}
-    ball: { id: 'ball', x: 9, y: 4.5, visible: true },
+    ball: { id: 'ball', x: 9, y: 4.5, visible: false },
     selection: null,
   });
 
@@ -68,10 +76,15 @@
   };
 
   let state = DEFAULT_STATE();
+  state.layoutStates = {};
+  ensureLayoutState(state.layout);
+  bindLayoutState(state.layout);
   pushHistory(state);
 
   const stage = $('#stage');
   const inspector = $('#inspector');
+  const inspectorOverlay = $('#inspectorOverlay');
+  const inspectorHandle = $('#inspectorHandle');
   const notesEl = $('#notes');
   const statObjects = $('#statObjects');
   const chipMode = $('#chipMode');
@@ -89,42 +102,67 @@
 
   const defs = document.createElementNS(svgNS, 'defs');
   defs.innerHTML = `
+    <linearGradient id="bgFullH" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1f2b"></stop>
+      <stop offset="100%" stop-color="#0b1218"></stop>
+    </linearGradient>
+    <linearGradient id="bgFullV" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1a1f1a"></stop>
+      <stop offset="100%" stop-color="#0e1410"></stop>
+    </linearGradient>
+    <linearGradient id="bgHalfH" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1d1612"></stop>
+      <stop offset="100%" stop-color="#0e0b0a"></stop>
+    </linearGradient>
+    <linearGradient id="bgHalfV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#121625"></stop>
+      <stop offset="100%" stop-color="#0b0e19"></stop>
+    </linearGradient>
     <marker id="arrowHead" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
     </marker>
     <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
       <feDropShadow dx="0" dy="0.35" stdDeviation="0.35" flood-color="rgba(0,0,0,.55)"/>
     </filter>
-    <symbol id="playerSymbol" viewBox="-0.6 -0.6 1.2 1.2">
-      <circle cx="0" cy="0" r="0.5" fill="currentColor"></circle>
-      <circle cx="-0.18" cy="-0.18" r="0.08" fill="rgba(255,255,255,.25)"></circle>
-    </symbol>
   `;
   svg.appendChild(defs);
 
+  const gRoot = document.createElementNS(svgNS, 'g');
   const gCourt = document.createElementNS(svgNS, 'g');
   const gDrawings = document.createElementNS(svgNS, 'g');
   const gPlayers = document.createElementNS(svgNS, 'g');
   const gBall = document.createElementNS(svgNS, 'g');
   const gText = document.createElementNS(svgNS, 'g');
 
+  gRoot.setAttribute('id', 'root');
   gCourt.setAttribute('id', 'court');
   gDrawings.setAttribute('id', 'drawings');
   gPlayers.setAttribute('id', 'players');
   gBall.setAttribute('id', 'ballLayer');
   gText.setAttribute('id', 'textLayer');
 
-  svg.appendChild(gCourt);
-  svg.appendChild(gDrawings);
-  svg.appendChild(gPlayers);
-  svg.appendChild(gBall);
-  svg.appendChild(gText);
+  svg.appendChild(gRoot);
+  gRoot.appendChild(gCourt);
+  gRoot.appendChild(gDrawings);
+  gRoot.appendChild(gPlayers);
+  gRoot.appendChild(gBall);
+  gRoot.appendChild(gText);
 
   stage.appendChild(svg);
 
   // Court drawing
   function drawCourt() {
     gCourt.innerHTML = '';
+    const isHalf = state.layout === 'half-h' || state.layout === 'half-v';
+    const courtW = isHalf ? COURT_W / 2 : COURT_W;
+    const netX = isHalf ? courtW : COURT_W / 2;
+    const bgId = state.layout === 'full-h'
+      ? 'bgFullH'
+      : state.layout === 'full-v'
+        ? 'bgFullV'
+        : state.layout === 'half-h'
+          ? 'bgHalfH'
+          : 'bgHalfV';
     const court = (tag, attrs={}) => {
       const el = document.createElementNS(svgNS, tag);
       for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
@@ -133,36 +171,22 @@
     };
 
     // Background
-    court('rect', { x: 0, y: 0, width: COURT_W, height: COURT_H, rx: 0.4, fill: 'rgba(255,255,255,0.03)' });
+    court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, rx: 0.4, fill: `url(#${bgId})` });
+    court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, rx: 0.4, fill: 'rgba(255,255,255,0.03)' });
     // Border
-    court('rect', { x: 0, y: 0, width: COURT_W, height: COURT_H, fill: 'none', stroke: 'rgba(255,255,255,0.20)', 'stroke-width': 0.08 });
+    court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, fill: 'none', stroke: 'rgba(255,255,255,0.20)', 'stroke-width': 0.08 });
 
-    // Midline and net
-    court('line', { x1: COURT_W/2, y1: 0, x2: COURT_W/2, y2: COURT_H, stroke: 'rgba(255,255,255,0.20)', 'stroke-width': 0.08 });
-    court('rect', { x: COURT_W/2 - 0.06, y: 0, width: 0.12, height: COURT_H, fill: 'rgba(94,234,212,0.10)' });
+    // Net (midline for full court, boundary for half court)
+    if (!isHalf) {
+      court('line', { x1: netX, y1: 0, x2: netX, y2: COURT_H, stroke: 'rgba(255,255,255,0.20)', 'stroke-width': 0.08 });
+    }
+    court('rect', { x: netX - 0.06, y: 0, width: 0.12, height: COURT_H, fill: 'rgba(94,234,212,0.10)' });
 
-    // 3m lines
-    court('line', { x1: 3, y1: 0, x2: 3, y2: COURT_H, stroke: 'rgba(255,255,255,0.14)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
-    court('line', { x1: COURT_W-3, y1: 0, x2: COURT_W-3, y2: COURT_H, stroke: 'rgba(255,255,255,0.14)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
-
-    // Zones labels (tiny)
-    const label = (x,y,t) => {
-      const el = document.createElementNS(svgNS, 'text');
-      el.setAttribute('x', x);
-      el.setAttribute('y', y);
-      el.setAttribute('font-size', '0.5');
-      el.setAttribute('fill', 'rgba(255,255,255,0.18)');
-      el.setAttribute('text-anchor', 'middle');
-      el.textContent = t;
-      gCourt.appendChild(el);
-    };
-    // Optional rotation hints
-    label(1.5, 1.0, '4');
-    label(1.5, 4.8, '3');
-    label(1.5, 8.5, '2');
-    label(COURT_W-1.5, 1.0, '5');
-    label(COURT_W-1.5, 4.8, '6');
-    label(COURT_W-1.5, 8.5, '1');
+    // 3m lines (3m from net)
+    court('line', { x1: netX - 3, y1: 0, x2: netX - 3, y2: COURT_H, stroke: 'rgba(255,255,255,0.14)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
+    if (!isHalf) {
+      court('line', { x1: netX + 3, y1: 0, x2: netX + 3, y2: COURT_H, stroke: 'rgba(255,255,255,0.14)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
+    }
   }
 
   drawCourt();
@@ -170,11 +194,88 @@
   // Helpers
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  function defaultLayoutState(layoutId) {
+    const baseView = LAYOUTS[layoutId]?.view || LAYOUTS['full-h'].view;
+    return {
+      view: { ...baseView },
+      notes: '',
+      objects: [],
+      drawings: [],
+      texts: [],
+      ball: { id: 'ball', x: 9, y: 4.5, visible: false },
+      selection: null,
+    };
+  }
+
+  function ensureLayoutState(layoutId) {
+    if (!state.layoutStates) state.layoutStates = {};
+    if (!state.layoutStates[layoutId]) state.layoutStates[layoutId] = defaultLayoutState(layoutId);
+    if (!state.layoutStates[layoutId].view) {
+      state.layoutStates[layoutId].view = { ...(LAYOUTS[layoutId]?.view || LAYOUTS['full-h'].view) };
+    }
+  }
+
+  function bindLayoutState(layoutId) {
+    ensureLayoutState(layoutId);
+    const ls = state.layoutStates[layoutId];
+    const baseView = LAYOUTS[layoutId]?.view || LAYOUTS['full-h'].view;
+    if (!ls.view || ls.view.w > baseView.w * 1.05 || ls.view.h > baseView.h * 1.05) {
+      ls.view = { ...baseView };
+    }
+    state.view = ls.view;
+    state.notes = ls.notes || '';
+    state.objects = ls.objects || [];
+    state.drawings = ls.drawings || [];
+    state.texts = ls.texts || [];
+    state.ball = ls.ball || { id:'ball', x:9, y:4.5, visible:false };
+    state.selection = ls.selection || null;
+  }
+
+  function syncLayoutState() {
+    const ls = state.layoutStates?.[state.layout];
+    if (!ls) return;
+    ls.view = state.view;
+    ls.notes = state.notes || '';
+    ls.selection = state.selection || null;
+    ls.ball = state.ball;
+  }
+
   function setViewBox(v) {
-    state.view = v;
-    svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
-    const zoom = 20 / v.w;
+    const layout = LAYOUTS[state.layout] || LAYOUTS['full-h'];
+    const isHalf = state.layout === 'half-h' || state.layout === 'half-v';
+    const nextView = isHalf ? { ...layout.view } : v;
+    state.view = nextView;
+    svg.setAttribute('viewBox', `${nextView.x} ${nextView.y} ${nextView.w} ${nextView.h}`);
+    const base = (LAYOUTS[state.layout] || LAYOUTS['full-h']).view.w;
+    const zoom = base / nextView.w;
     chipZoom.textContent = `Zoom: ${Math.round(zoom*100)}%`;
+  }
+
+  function applyLayoutTransform() {
+    const layout = LAYOUTS[state.layout] || LAYOUTS['full-h'];
+    if (layout.rotate) {
+      gRoot.setAttribute('transform', `translate(${COURT_H} 0) rotate(90)`);
+    } else {
+      gRoot.removeAttribute('transform');
+    }
+  }
+
+  function setLayout(layoutId) {
+    syncLayoutState();
+    const layout = LAYOUTS[layoutId] || LAYOUTS['full-h'];
+    state.layout = layout.id;
+    bindLayoutState(layout.id);
+    setViewBox({ ...state.view });
+    applyLayoutTransform();
+    updateLayoutTabs();
+    commit();
+  }
+
+  function updateLayoutTabs() {
+    $$('.layoutTabs .tab').forEach((btn) => {
+      const isActive = btn.getAttribute('data-layout') === state.layout;
+      btn.classList.toggle('isActive', isActive);
+    });
   }
 
   function applyLayerVisibility() {
@@ -199,6 +300,8 @@
 
   function setSelection(id) {
     state.selection = id;
+    const ls = state.layoutStates?.[state.layout];
+    if (ls) ls.selection = id;
     render();
   }
 
@@ -206,7 +309,7 @@
     const pt = svg.createSVGPoint();
     pt.x = clientX;
     pt.y = clientY;
-    const ctm = svg.getScreenCTM();
+    const ctm = gRoot.getScreenCTM();
     if (!ctm) return { x: 0, y: 0 };
     const inv = ctm.inverse();
     const p = pt.matrixTransform(inv);
@@ -225,41 +328,59 @@
       g.style.color = teamColor(o.team);
       g.style.cursor = 'grab';
 
-      const use = document.createElementNS(svgNS, 'use');
-      use.setAttribute('href', '#playerSymbol');
-      use.setAttribute('filter', 'url(#softShadow)');
-      g.appendChild(use);
+      const base = document.createElementNS(svgNS, 'circle');
+      base.setAttribute('cx', '0');
+      base.setAttribute('cy', '0');
+      base.setAttribute('r', '0.3');
+      base.setAttribute('fill', 'currentColor');
+      base.setAttribute('filter', 'url(#softShadow)');
+      g.appendChild(base);
+
+      const highlight = document.createElementNS(svgNS, 'circle');
+      highlight.setAttribute('cx', '-0.1');
+      highlight.setAttribute('cy', '-0.1');
+      highlight.setAttribute('r', '0.045');
+      highlight.setAttribute('fill', 'rgba(255,255,255,.25)');
+      g.appendChild(highlight);
 
       const txt = document.createElementNS(svgNS, 'text');
       txt.setAttribute('x', '0');
-      txt.setAttribute('y', '0.16');
+      txt.setAttribute('y', '-0.06');
       txt.setAttribute('text-anchor', 'middle');
-      txt.setAttribute('font-size', '0.38');
-      txt.setAttribute('fill', 'rgba(0,0,0,0.75)');
+      txt.setAttribute('font-size', '0.23');
+      txt.setAttribute('fill', 'rgba(255,255,255,0.96)');
+      txt.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+      txt.setAttribute('stroke-width', '0.03');
+      txt.setAttribute('paint-order', 'stroke');
+      txt.setAttribute('font-weight', '700');
       txt.style.pointerEvents = 'none';
       txt.textContent = o.label || '';
       g.appendChild(txt);
 
-      const badge = document.createElementNS(svgNS, 'text');
-      badge.setAttribute('x', '0');
-      badge.setAttribute('y', '-0.62');
-      badge.setAttribute('text-anchor', 'middle');
-      badge.setAttribute('font-size', '0.28');
-      badge.setAttribute('fill', 'rgba(255,255,255,0.8)');
-      badge.style.pointerEvents = 'none';
-      badge.textContent = o.role || '';
-      g.appendChild(badge);
+      const role = document.createElementNS(svgNS, 'text');
+      role.setAttribute('x', '0');
+      role.setAttribute('y', '0.18');
+      role.setAttribute('text-anchor', 'middle');
+      role.setAttribute('font-size', '0.17');
+      role.setAttribute('fill', 'rgba(255,255,255,0.9)');
+      role.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+      role.setAttribute('stroke-width', '0.03');
+      role.setAttribute('paint-order', 'stroke');
+      role.setAttribute('font-weight', '700');
+      role.style.pointerEvents = 'none';
+      role.textContent = o.role || '';
+      g.appendChild(role);
 
       if (state.selection === o.id) {
         const sel = document.createElementNS(svgNS, 'circle');
         sel.setAttribute('cx', '0');
         sel.setAttribute('cy', '0');
-        sel.setAttribute('r', '0.62');
+        sel.setAttribute('r', '0.4');
         sel.setAttribute('fill', 'none');
         sel.setAttribute('stroke', 'rgba(255,255,255,0.65)');
         sel.setAttribute('stroke-width', '0.06');
         sel.style.pointerEvents = 'none';
-        g.insertBefore(sel, use);
+        g.insertBefore(sel, base);
       }
 
       gPlayers.appendChild(g);
@@ -278,12 +399,34 @@
     const c = document.createElementNS(svgNS, 'circle');
     c.setAttribute('cx', '0');
     c.setAttribute('cy', '0');
-    c.setAttribute('r', '0.22');
-    c.setAttribute('fill', 'rgba(255,255,255,0.85)');
-    c.setAttribute('stroke', 'rgba(0,0,0,0.35)');
+    c.setAttribute('r', '0.28');
+    c.setAttribute('fill', '#f7f1e5');
+    c.setAttribute('stroke', '#cbb48e');
     c.setAttribute('stroke-width', '0.04');
     c.setAttribute('filter', 'url(#softShadow)');
     g.appendChild(c);
+
+    const highlight = document.createElementNS(svgNS, 'circle');
+    highlight.setAttribute('cx', '-0.12');
+    highlight.setAttribute('cy', '-0.12');
+    highlight.setAttribute('r', '0.08');
+    highlight.setAttribute('fill', 'rgba(255,255,255,0.5)');
+    g.appendChild(highlight);
+
+    const seams = [
+      'M -0.2 -0.1 C -0.05 -0.22 0.1 -0.2 0.2 -0.06',
+      'M -0.2 0.12 C -0.04 0.0 0.12 0.0 0.2 0.14',
+      'M -0.06 -0.24 C 0.04 -0.1 0.04 0.1 -0.04 0.24',
+    ];
+    for (const d of seams) {
+      const s = document.createElementNS(svgNS, 'path');
+      s.setAttribute('d', d);
+      s.setAttribute('fill', 'none');
+      s.setAttribute('stroke', '#d9c7a7');
+      s.setAttribute('stroke-width', '0.035');
+      s.setAttribute('stroke-linecap', 'round');
+      g.appendChild(s);
+    }
 
     if (state.selection === 'ball') {
       const sel = document.createElementNS(svgNS, 'circle');
@@ -508,8 +651,10 @@
 
   function render() {
     notesEl.value = state.notes || '';
+    applyLayoutTransform();
     applyLayerVisibility();
     setViewBox(state.view);
+    updateLayoutTabs();
     renderCourtSelectionHint();
     renderDrawings();
     renderPlayers();
@@ -527,25 +672,37 @@
   }
 
   function commit() {
+    syncLayoutState();
     pushHistory(state);
     render();
   }
 
   function replaceState(next) {
     state = next;
-    if (!state.view) state.view = { x:-1, y:-1, w:20, h:11 };
+    if (!state.layout) state.layout = 'full-h';
+    if (!LAYOUTS[state.layout]) state.layout = 'full-h';
     if (!state.layers) state.layers = { players:true, ball:true, drawings:true, text:true };
-    if (!state.objects) state.objects = [];
-    if (!state.drawings) state.drawings = [];
-    if (!state.texts) state.texts = [];
-    if (!state.ball) state.ball = { id:'ball', x:9, y:4.5, visible:true };
+    if (!state.layoutStates) {
+      state.layoutStates = {};
+      state.layoutStates[state.layout] = {
+        view: state.view || { ...(LAYOUTS[state.layout]?.view || LAYOUTS['full-h'].view) },
+        notes: state.notes || '',
+        objects: state.objects || [],
+        drawings: state.drawings || [],
+        texts: state.texts || [],
+        ball: state.ball || { id:'ball', x:9, y:4.5, visible:false },
+        selection: state.selection || null,
+      };
+    }
+    for (const id of Object.keys(LAYOUTS)) ensureLayoutState(id);
+    bindLayoutState(state.layout);
     pushHistory(state);
     render();
   }
 
   // Object creation
-  function addPlayer(team='A', x= team==='A' ? 4 : 14, y=4.5, label='') {
-    state.objects.push({ id: ID(), type:'player', team, x, y, role:'X', label });
+  function addPlayer(team='A', x= team==='A' ? 4 : 14, y=4.5, label='', role='X') {
+    state.objects.push({ id: ID(), type:'player', team, x, y, role, label });
     commit();
   }
 
@@ -576,63 +733,50 @@
     state.objects = [];
     state.drawings = [];
     state.texts = [];
-    state.ball = { id:'ball', x:9, y:4.5, visible:true };
+    state.ball = { id:'ball', x:9, y:4.5, visible:false };
     state.selection = null;
     commit();
   }
 
-  function preset6v6() {
-    presetEmpty();
-    // Rough positions in rotation layout
-    // Team A (left side)
-    const A = [
+  const DEFAULT_SPOTS = {
+    A: [
       {x: 2.0, y: 7.8, n:'1'},
       {x: 2.0, y: 4.5, n:'6'},
       {x: 2.0, y: 1.2, n:'5'},
       {x: 6.0, y: 1.2, n:'4'},
       {x: 6.0, y: 4.5, n:'3'},
       {x: 6.0, y: 7.8, n:'2'},
-    ];
-    const B = [
+    ],
+    B: [
       {x: 16.0, y: 7.8, n:'1'},
       {x: 16.0, y: 4.5, n:'6'},
       {x: 16.0, y: 1.2, n:'5'},
       {x: 12.0, y: 1.2, n:'4'},
       {x: 12.0, y: 4.5, n:'3'},
       {x: 12.0, y: 7.8, n:'2'},
-    ];
-    for (const p of A) state.objects.push({ id: ID(), type:'player', team:'A', x:p.x, y:p.y, role:'X', label:p.n });
-    for (const p of B) state.objects.push({ id: ID(), type:'player', team:'B', x:p.x, y:p.y, role:'X', label:p.n });
-    state.ball = { id:'ball', x:9, y:4.5, visible:true };
-    commit();
-  }
+    ],
+  };
 
-  function preset3v3() {
+  const DEFAULT_ROLE_BY_LABEL = {
+    '1': 'OP',
+    '2': 'OH',
+    '3': 'MB',
+    '4': 'OH',
+    '5': 'L',
+    '6': 'S',
+  };
+
+  function insertDefaultTeams(mode) {
     presetEmpty();
-    const A = [{x:3.0,y:2.0,n:'A1'},{x:3.0,y:7.0,n:'A2'},{x:6.0,y:4.5,n:'A3'}];
-    const B = [{x:15.0,y:2.0,n:'B1'},{x:15.0,y:7.0,n:'B2'},{x:12.0,y:4.5,n:'B3'}];
-    for (const p of A) state.objects.push({ id: ID(), type:'player', team:'A', x:p.x, y:p.y, role:'X', label:p.n });
-    for (const p of B) state.objects.push({ id: ID(), type:'player', team:'B', x:p.x, y:p.y, role:'X', label:p.n });
-    commit();
-  }
-
-  function presetSideout() {
-    preset6v6();
-    // Add some common arrows (receive -> set -> attack)
-    const d1 = `M 1.8 7.8 C 3.5 7.0 4.8 6.2 6.2 5.4`;
-    const d2 = `M 6.2 5.4 C 7.0 4.8 7.8 4.5 8.7 4.2`;
-    state.drawings.push({ id: ID(), type:'arrow', team:'A', path:d1, style:{ width:'0.12', opacity:'0.9' } });
-    state.drawings.push({ id: ID(), type:'arrow', team:'A', path:d2, style:{ width:'0.12', opacity:'0.9' } });
-    commit();
-  }
-
-  function presetBreakpoint() {
-    preset6v6();
-    // Block/defense arrows on Team B side
-    const d1 = `M 11.8 4.5 C 10.5 4.5 9.8 4.5 9.2 4.5`;
-    const d2 = `M 12.0 1.2 C 10.8 2.5 10.2 3.5 9.2 4.5`;
-    state.drawings.push({ id: ID(), type:'arrow', team:'B', path:d1, style:{ width:'0.12', opacity:'0.9' } });
-    state.drawings.push({ id: ID(), type:'arrow', team:'B', path:d2, style:{ width:'0.12', opacity:'0.9' } });
+    const addTeam = (team) => {
+      for (const p of DEFAULT_SPOTS[team]) {
+        const role = DEFAULT_ROLE_BY_LABEL[p.n] || 'X';
+        state.objects.push({ id: ID(), type:'player', team, x:p.x, y:p.y, role, label:p.n });
+      }
+    };
+    if (mode === 'A' || mode === 'both') addTeam('A');
+    if (mode === 'B' || mode === 'both') addTeam('B');
+    state.ball = { id:'ball', x:9, y:4.5, visible:false };
     commit();
   }
 
@@ -707,7 +851,7 @@
     const sel = state.selection ? objById(state.selection) : null;
     const team = (sel && sel.team) ? sel.team : 'A';
     const x = team === 'A' ? 4 : 14;
-    addPlayer(team, x, 4.5, '');
+    addPlayer(team, x, 4.5, '', 'X');
   });
 
   $('#btnAddBall').addEventListener('click', () => toggleBall());
@@ -734,7 +878,20 @@
 
   function openExport() {
     dlgTitle.textContent = 'Export JSON';
-    ioText.value = JSON.stringify(state, null, 2);
+    const ls = state.layoutStates?.[state.layout] || defaultLayoutState(state.layout);
+    const payload = {
+      version: state.version || 1,
+      meta: state.meta || { createdAt: new Date().toISOString() },
+      layout: state.layout,
+      view: ls.view,
+      notes: ls.notes,
+      layers: state.layers,
+      objects: ls.objects,
+      drawings: ls.drawings,
+      texts: ls.texts,
+      ball: ls.ball,
+    };
+    ioText.value = JSON.stringify(payload, null, 2);
     btnIOMain.textContent = 'Copia';
     btnIOMain.onclick = async (e) => {
       e.preventDefault();
@@ -754,7 +911,18 @@
       e.preventDefault();
       try {
         const next = JSON.parse(ioText.value);
-        replaceState(next);
+        ensureLayoutState(state.layout);
+        const ls = state.layoutStates[state.layout];
+        ls.view = next.view || { ...(LAYOUTS[state.layout]?.view || LAYOUTS['full-h'].view) };
+        ls.notes = next.notes || '';
+        ls.objects = Array.isArray(next.objects) ? next.objects : [];
+        ls.drawings = Array.isArray(next.drawings) ? next.drawings : [];
+        ls.texts = Array.isArray(next.texts) ? next.texts : [];
+        ls.ball = next.ball || { id:'ball', x:9, y:4.5, visible:false };
+        ls.selection = null;
+        bindLayoutState(state.layout);
+        if (next.layers) state.layers = next.layers;
+        commit();
         dlgIO.close();
       } catch (err) {
         alert('JSON non valido');
@@ -770,16 +938,48 @@
   // Notes binding
   notesEl.addEventListener('input', () => { state.notes = notesEl.value; commit(); });
 
-  // Preset buttons
+  // Layout tabs
+  $$('.layoutTabs .tab').forEach((b) => {
+    b.addEventListener('click', () => {
+      const layoutId = b.getAttribute('data-layout');
+      if (layoutId) setLayout(layoutId);
+    });
+  });
+
+  // Default teams + empty
   $$('.presetGrid .btn').forEach(b => {
     b.addEventListener('click', () => {
       const p = b.getAttribute('data-preset');
       if (p === 'empty') presetEmpty();
-      if (p === '6v6') preset6v6();
-      if (p === '3v3') preset3v3();
-      if (p === 'sideout') presetSideout();
-      if (p === 'breakpoint') presetBreakpoint();
+      if (p === 'teamA') insertDefaultTeams('A');
+      if (p === 'teamB') insertDefaultTeams('B');
+      if (p === 'teams') insertDefaultTeams('both');
     });
+  });
+
+  // Add player by role
+  const addTeamSel = $('#addTeam');
+  const addRoleSel = $('#addRole');
+  const addNumberInput = $('#addNumber');
+  const fillSelect = (sel, items, getValue) => {
+    sel.innerHTML = '';
+    for (const item of items) {
+      const opt = document.createElement('option');
+      opt.value = getValue(item);
+      opt.textContent = item.name;
+      sel.appendChild(opt);
+    }
+  };
+  fillSelect(addTeamSel, TEAMS, (t) => t.id);
+  fillSelect(addRoleSel, ROLES, (r) => r.id);
+  addTeamSel.value = 'A';
+  addRoleSel.value = 'X';
+  $('#btnAddRolePlayer').addEventListener('click', () => {
+    const team = addTeamSel.value || 'A';
+    const role = addRoleSel.value || 'X';
+    const label = (addNumberInput.value || '').trim();
+    addPlayer(team, team === 'A' ? 4 : 14, 4.5, label, role);
+    addNumberInput.value = '';
   });
 
   // Context menu dialog
@@ -831,6 +1031,7 @@
   let arrowDraft = null; // {team, start, cur, pathEl}
   let longPressTimer = null;
   let spaceDown = false;
+  let overlayDrag = null;
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') { spaceDown = true; setMode(MODE.PAN); }
@@ -849,6 +1050,44 @@
 
   window.addEventListener('keyup', (e) => {
     if (e.code === 'Space') { spaceDown = false; setMode(MODE.SELECT); }
+  });
+
+  // Draggable inspector overlay
+  inspectorHandle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    inspectorOverlay.setPointerCapture(e.pointerId);
+    const wrapRect = stage.getBoundingClientRect();
+    const rect = inspectorOverlay.getBoundingClientRect();
+    inspectorOverlay.style.right = '';
+    inspectorOverlay.style.bottom = '';
+    overlayDrag = {
+      id: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: rect.left - wrapRect.left,
+      startTop: rect.top - wrapRect.top,
+      wrapRect,
+    };
+    inspectorOverlay.style.left = `${overlayDrag.startLeft}px`;
+    inspectorOverlay.style.top = `${overlayDrag.startTop}px`;
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!overlayDrag || e.pointerId !== overlayDrag.id) return;
+    const dx = e.clientX - overlayDrag.startX;
+    const dy = e.clientY - overlayDrag.startY;
+    const maxLeft = overlayDrag.wrapRect.width - inspectorOverlay.offsetWidth;
+    const maxTop = overlayDrag.wrapRect.height - inspectorOverlay.offsetHeight;
+    const left = clamp(overlayDrag.startLeft + dx, 0, Math.max(0, maxLeft));
+    const top = clamp(overlayDrag.startTop + dy, 0, Math.max(0, maxTop));
+    inspectorOverlay.style.left = `${left}px`;
+    inspectorOverlay.style.top = `${top}px`;
+  });
+
+  window.addEventListener('pointerup', (e) => {
+    if (!overlayDrag || e.pointerId !== overlayDrag.id) return;
+    inspectorOverlay.releasePointerCapture(e.pointerId);
+    overlayDrag = null;
   });
 
   function hitTestTarget(el) {
@@ -870,6 +1109,7 @@
   }
 
   svg.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
     svg.setPointerCapture(e.pointerId);
     activePointerId = e.pointerId;
 
@@ -935,6 +1175,7 @@
 
   svg.addEventListener('pointermove', (e) => {
     if (e.pointerId !== activePointerId) return;
+    e.preventDefault();
     const pt = svgPointFromClient(e.clientX, e.clientY);
 
     // cancel long press if moved a bit
@@ -980,6 +1221,7 @@
 
   svg.addEventListener('pointerup', (e) => {
     if (e.pointerId !== activePointerId) return;
+    e.preventDefault();
     cancelLongPress();
     svg.releasePointerCapture(e.pointerId);
     activePointerId = null;
@@ -1030,6 +1272,7 @@
 
   // Wheel zoom (desktop). Use Alt+wheel for zoom, wheel alone scrolls page.
   svg.addEventListener('wheel', (e) => {
+    if (drag) return;
     if (!e.altKey) return;
     e.preventDefault();
     const delta = Math.sign(e.deltaY);
@@ -1051,6 +1294,7 @@
 
   // Tap on empty to set text mode quickly if T is active
   svg.addEventListener('dblclick', (e) => {
+    e.preventDefault();
     const pt = svgPointFromClient(e.clientX, e.clientY);
     if (hitTestTarget(e.target)) return;
     addTextAt(pt.x, pt.y, 'Testo', 'A');
@@ -1098,6 +1342,7 @@
   // Selection / delete with long press via menu
   // Auto-load state
   if (!loadLocal()) render();
+  updateLayoutTabs();
 
   // Auto commit after first render to have baseline
   pushHistory(state);
