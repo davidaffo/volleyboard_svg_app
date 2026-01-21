@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <title>VolleyBoard SVG</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <span class="title">VolleyBoard</span>
+    </div>
+    <div class="toolbar">
+      <button id="btnAddPlayer" class="btn" title="Aggiungi giocatore">+ Giocatore</button>
+      <button id="btnAddBall" class="btn" title="Mostra/Nascondi palla">⚪ Palla</button>
+      <button id="btnArrow" class="btn" title="Disegna frecce">↗ Frecce</button>
+      <button id="btnText" class="btn" title="Aggiungi testo">T</button>
+      <button id="btnRotate" class="btn" title="Ruota (1→6)">⟳ Rotazione</button>
+      <button id="btnUndo" class="btn" title="Annulla">↶</button>
+      <button id="btnRedo" class="btn" title="Ripristina">↷</button>
+      <button id="btnReset" class="btn btnDanger" title="Reset">Reset</button>
+      <button id="btnExport" class="btn" title="Esporta JSON">Export</button>
+      <button id="btnImport" class="btn" title="Importa JSON">Import</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="stageWrap">
+      <div class="stage" id="stage"></div>
+      <div class="hud" id="hud">
+        <div class="hudRow">
+          <span class="chip" id="chipMode">Modalità: Selezione</span>
+          <span class="chip" id="chipZoom">Zoom: 100%</span>
+        </div>
+        <div class="hudRow">
+          <span class="hint">Drag: sposta oggetti • Pinch/Alt+wheel: zoom • Space+drag: pan • Tap lungo: menu</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <div class="panelTitle">Oggetto selezionato</div>
+        <div id="inspector" class="inspector">
+          <div class="muted">Nessuna selezione</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panelTitle">Preset rapidi</div>
+        <div class="presetGrid">
+          <button class="btn" data-preset="6v6">6 vs 6</button>
+          <button class="btn" data-preset="3v3">3 vs 3</button>
+          <button class="btn" data-preset="sideout">Sideout</button>
+          <button class="btn" data-preset="breakpoint">Breakpoint</button>
+          <button class="btn" data-preset="empty">Campo vuoto</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panelTitle">Note</div>
+        <textarea id="notes" class="notes" placeholder="Annotazioni libere (salvate nello stato)..."></textarea>
+      </div>
+
+      <div class="panel">
+        <div class="panelTitle">Stato</div>
+        <div class="kv">
+          <div class="k">Oggetti</div><div class="v" id="statObjects">0</div>
+          <div class="k">Layer</div><div class="v">Giocatori • Palla • Disegni • Testo</div>
+          <div class="k">Formato</div><div class="v">SVG + JSON</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <dialog id="dlgIO" class="dlg">
+    <form method="dialog" class="dlgForm">
+      <div class="dlgTitle" id="dlgTitle">Import/Export</div>
+      <textarea id="ioText" class="ioText" spellcheck="false"></textarea>
+      <div class="dlgActions">
+        <button value="cancel" class="btn">Chiudi</button>
+        <button id="btnIOMain" value="ok" class="btn btnPrimary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgMenu" class="dlg">
+    <form method="dialog" class="dlgForm small">
+      <div class="dlgTitle">Azioni</div>
+      <div class="menuGrid" id="menuGrid"></div>
+      <div class="dlgActions">
+        <button value="cancel" class="btn">Chiudi</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="./app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+    }
+  </script>
+</body>
+</html>

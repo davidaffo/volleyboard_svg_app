@@ -1,0 +1,10 @@
+{
+  "id": "volleyboard-svg",
+  "name": "VolleyBoard SVG",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Lavagna tattica per pallavolo basata su SVG + JSON (drag, frecce, testo, export/import).",
+  "author": "Generated",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

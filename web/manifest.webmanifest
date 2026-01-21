@@ -1,0 +1,9 @@
+{
+  "name": "VolleyBoard SVG",
+  "short_name": "VolleyBoard",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0f12",
+  "theme_color": "#111111",
+  "icons": []
+}
