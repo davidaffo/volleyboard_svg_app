@@ -10,8 +10,8 @@
   const COURT_H = 9;
 
   const LAYOUTS = {
-    'full-h': { id: 'full-h', label: 'Intero orizz.', view: { x: -1, y: -1, w: 20, h: 11 } },
-    'full-v': { id: 'full-v', label: 'Intero vert.', view: { x: -1, y: -1, w: 11, h: 20 } },
+    'full-h': { id: 'full-h', label: 'Campo intero', view: { x: -1, y: -1, w: 20, h: 11 } },
+    'full-v': { id: 'full-v', label: 'Campo intero (vert.)', view: { x: -1, y: -1, w: 11, h: 20 } },
     'half': { id: 'half', label: 'Mezzo campo', view: { x: 0, y: 0, w: 9, h: 9 } },
   };
 
@@ -38,11 +38,12 @@
   ];
 
   const ROLES = [
-    { id: 'S', name: 'Palleggiatore (S)' },
-    { id: 'OH', name: 'Schiacciatore (OH)' },
-    { id: 'MB', name: 'Centrale (MB)' },
-    { id: 'OP', name: 'Opposto (OP)' },
-    { id: 'L', name: 'Libero (L)' },
+    { id: 'P', name: 'Palleggiatore (P)' },
+    { id: 'S1', name: 'Schiacciatore 1 (S1)' },
+    { id: 'C2', name: 'Centrale 2 (C2)' },
+    { id: 'O', name: 'Opposto (O)' },
+    { id: 'S2', name: 'Schiacciatore 2 (S2)' },
+    { id: 'C1', name: 'Centrale 1 (C1)' },
     { id: 'X', name: 'Altro (X)' },
   ];
 
@@ -127,13 +128,11 @@
     <marker id="arrowHead" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
     </marker>
-    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="0.35" stdDeviation="0.35" flood-color="rgba(0,0,0,.55)"/>
-    </filter>
   `;
   svg.appendChild(defs);
 
   const gRoot = document.createElementNS(svgNS, 'g');
+  const gScene = document.createElementNS(svgNS, 'g');
   const gCourt = document.createElementNS(svgNS, 'g');
   const gDrawings = document.createElementNS(svgNS, 'g');
   const gPlayers = document.createElementNS(svgNS, 'g');
@@ -141,6 +140,7 @@
   const gText = document.createElementNS(svgNS, 'g');
 
   gRoot.setAttribute('id', 'root');
+  gScene.setAttribute('id', 'scene');
   gCourt.setAttribute('id', 'court');
   gDrawings.setAttribute('id', 'drawings');
   gPlayers.setAttribute('id', 'players');
@@ -148,11 +148,12 @@
   gText.setAttribute('id', 'textLayer');
 
   svg.appendChild(gRoot);
-  gRoot.appendChild(gCourt);
-  gRoot.appendChild(gDrawings);
-  gRoot.appendChild(gPlayers);
-  gRoot.appendChild(gBall);
-  gRoot.appendChild(gText);
+  gRoot.appendChild(gScene);
+  gScene.appendChild(gCourt);
+  gScene.appendChild(gDrawings);
+  gScene.appendChild(gPlayers);
+  gScene.appendChild(gBall);
+  gScene.appendChild(gText);
 
   stage.appendChild(svg);
 
@@ -272,13 +273,13 @@
     const h = COURT_H;
     const angle = ((state.rotation % 360) + 360) % 360;
     if (angle === 90) {
-      gRoot.setAttribute('transform', `translate(${h} 0) rotate(90)`);
+      gScene.setAttribute('transform', `translate(${h} 0) rotate(90)`);
     } else if (angle === 180) {
-      gRoot.setAttribute('transform', `translate(${w} ${h}) rotate(180)`);
+      gScene.setAttribute('transform', `translate(${w} ${h}) rotate(180)`);
     } else if (angle === 270) {
-      gRoot.setAttribute('transform', `translate(0 ${w}) rotate(270)`);
+      gScene.setAttribute('transform', `translate(0 ${w}) rotate(270)`);
     } else {
-      gRoot.removeAttribute('transform');
+      gScene.removeAttribute('transform');
     }
     gRoot.setAttribute('clip-path', `url(#${isHalf ? 'clipHalf' : 'clipFull'})`);
   }
@@ -341,7 +342,7 @@
     const pt = svg.createSVGPoint();
     pt.x = clientX;
     pt.y = clientY;
-    const ctm = gRoot.getScreenCTM();
+    const ctm = gScene.getScreenCTM();
     if (!ctm) return { x: 0, y: 0 };
     const inv = ctm.inverse();
     const p = pt.matrixTransform(inv);
@@ -351,6 +352,7 @@
   // Rendering
   function renderPlayers() {
     gPlayers.innerHTML = '';
+    const angle = ((state.rotation % 360) + 360) % 360;
     for (const o of state.objects) {
       if (o.type !== 'player') continue;
 
@@ -365,7 +367,8 @@
       base.setAttribute('cy', '0');
       base.setAttribute('r', '0.3');
       base.setAttribute('fill', 'currentColor');
-      base.setAttribute('filter', 'url(#softShadow)');
+      base.setAttribute('stroke', 'rgba(0,0,0,0.25)');
+      base.setAttribute('stroke-width', '0.03');
       g.appendChild(base);
 
       const highlight = document.createElementNS(svgNS, 'circle');
@@ -375,33 +378,58 @@
       highlight.setAttribute('fill', 'rgba(255,255,255,.25)');
       g.appendChild(highlight);
 
-      const txt = document.createElementNS(svgNS, 'text');
-      txt.setAttribute('x', '0');
-      txt.setAttribute('y', '-0.06');
-      txt.setAttribute('text-anchor', 'middle');
-      txt.setAttribute('font-size', '0.23');
-      txt.setAttribute('fill', 'rgba(255,255,255,0.96)');
-      txt.setAttribute('stroke', 'rgba(0,0,0,0.45)');
-      txt.setAttribute('stroke-width', '0.03');
-      txt.setAttribute('paint-order', 'stroke');
-      txt.setAttribute('font-weight', '700');
-      txt.style.pointerEvents = 'none';
-      txt.textContent = o.label || '';
-      g.appendChild(txt);
+      const labelVal = (o.label || '').trim();
+      const roleVal = (o.role || '').trim();
+      const showBigLabel = labelVal && !roleVal;
+      const showBigRole = roleVal && !labelVal;
 
-      const role = document.createElementNS(svgNS, 'text');
-      role.setAttribute('x', '0');
-      role.setAttribute('y', '0.18');
-      role.setAttribute('text-anchor', 'middle');
-      role.setAttribute('font-size', '0.17');
-      role.setAttribute('fill', 'rgba(255,255,255,0.9)');
-      role.setAttribute('stroke', 'rgba(0,0,0,0.45)');
-      role.setAttribute('stroke-width', '0.03');
-      role.setAttribute('paint-order', 'stroke');
-      role.setAttribute('font-weight', '700');
-      role.style.pointerEvents = 'none';
-      role.textContent = o.role || '';
-      g.appendChild(role);
+      if (showBigLabel || showBigRole) {
+        const big = document.createElementNS(svgNS, 'text');
+        big.setAttribute('x', '0');
+        big.setAttribute('y', '0');
+        big.setAttribute('text-anchor', 'middle');
+        big.setAttribute('dominant-baseline', 'middle');
+        big.setAttribute('font-size', '0.32');
+        big.setAttribute('fill', 'rgba(255,255,255,0.96)');
+        big.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+        big.setAttribute('stroke-width', '0.03');
+        big.setAttribute('paint-order', 'stroke');
+        big.setAttribute('font-weight', '700');
+        big.style.pointerEvents = 'none';
+        if (angle) big.setAttribute('transform', `rotate(${-angle})`);
+        big.textContent = showBigLabel ? labelVal : roleVal;
+        g.appendChild(big);
+      } else {
+        const txt = document.createElementNS(svgNS, 'text');
+        txt.setAttribute('x', '0');
+        txt.setAttribute('y', '-0.06');
+        txt.setAttribute('text-anchor', 'middle');
+        txt.setAttribute('font-size', '0.23');
+        txt.setAttribute('fill', 'rgba(255,255,255,0.96)');
+        txt.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+        txt.setAttribute('stroke-width', '0.03');
+        txt.setAttribute('paint-order', 'stroke');
+        txt.setAttribute('font-weight', '700');
+        txt.style.pointerEvents = 'none';
+        if (angle) txt.setAttribute('transform', `rotate(${-angle})`);
+        txt.textContent = labelVal;
+        g.appendChild(txt);
+
+        const role = document.createElementNS(svgNS, 'text');
+        role.setAttribute('x', '0');
+        role.setAttribute('y', '0.18');
+        role.setAttribute('text-anchor', 'middle');
+        role.setAttribute('font-size', '0.17');
+        role.setAttribute('fill', 'rgba(255,255,255,0.9)');
+        role.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+        role.setAttribute('stroke-width', '0.03');
+        role.setAttribute('paint-order', 'stroke');
+        role.setAttribute('font-weight', '700');
+        role.style.pointerEvents = 'none';
+        if (angle) role.setAttribute('transform', `rotate(${-angle})`);
+        role.textContent = roleVal;
+        g.appendChild(role);
+      }
 
       if (state.selection === o.id) {
         const sel = document.createElementNS(svgNS, 'circle');
@@ -435,7 +463,8 @@
     c.setAttribute('fill', '#f7f1e5');
     c.setAttribute('stroke', '#cbb48e');
     c.setAttribute('stroke-width', '0.04');
-    c.setAttribute('filter', 'url(#softShadow)');
+    c.setAttribute('stroke', 'rgba(0,0,0,0.25)');
+    c.setAttribute('stroke-width', '0.03');
     g.appendChild(c);
 
     const highlight = document.createElementNS(svgNS, 'circle');
@@ -502,6 +531,7 @@
 
   function renderTexts() {
     gText.innerHTML = '';
+    const angle = ((state.rotation % 360) + 360) % 360;
     for (const t of state.texts) {
       const el = document.createElementNS(svgNS, 'text');
       el.setAttribute('data-id', t.id);
@@ -511,6 +541,7 @@
       el.setAttribute('fill', 'currentColor');
       el.style.color = teamColor(t.team);
       el.style.cursor = 'grab';
+      if (angle) el.setAttribute('transform', `rotate(${-angle}, ${t.x}, ${t.y})`);
       el.textContent = t.text;
 
       if (state.selection === t.id) {
@@ -774,32 +805,26 @@
     commit();
   }
 
+  const DEFAULT_SPOTS_A = [
+    {x: 2.0, y: 7.8, n:'1'},
+    {x: 2.0, y: 4.5, n:'6'},
+    {x: 2.0, y: 1.2, n:'5'},
+    {x: 6.0, y: 1.2, n:'4'},
+    {x: 6.0, y: 4.5, n:'3'},
+    {x: 6.0, y: 7.8, n:'2'},
+  ];
   const DEFAULT_SPOTS = {
-    A: [
-      {x: 2.0, y: 7.8, n:'1'},
-      {x: 2.0, y: 4.5, n:'6'},
-      {x: 2.0, y: 1.2, n:'5'},
-      {x: 6.0, y: 1.2, n:'4'},
-      {x: 6.0, y: 4.5, n:'3'},
-      {x: 6.0, y: 7.8, n:'2'},
-    ],
-    B: [
-      {x: 16.0, y: 7.8, n:'1'},
-      {x: 16.0, y: 4.5, n:'6'},
-      {x: 16.0, y: 1.2, n:'5'},
-      {x: 12.0, y: 1.2, n:'4'},
-      {x: 12.0, y: 4.5, n:'3'},
-      {x: 12.0, y: 7.8, n:'2'},
-    ],
+    A: DEFAULT_SPOTS_A,
+    B: DEFAULT_SPOTS_A.map((p) => ({ x: COURT_W - p.x, y: COURT_H - p.y, n: p.n })),
   };
 
   const DEFAULT_ROLE_BY_LABEL = {
-    '1': 'OP',
-    '2': 'OH',
-    '3': 'MB',
-    '4': 'OH',
-    '5': 'L',
-    '6': 'S',
+    '1': 'P',
+    '2': 'S1',
+    '3': 'C2',
+    '4': 'O',
+    '5': 'S2',
+    '6': 'C1',
   };
 
   function insertDefaultTeams(mode) {
@@ -807,7 +832,7 @@
     const addTeam = (team) => {
       for (const p of DEFAULT_SPOTS[team]) {
         const role = DEFAULT_ROLE_BY_LABEL[p.n] || 'X';
-        state.objects.push({ id: ID(), type:'player', team, x:p.x, y:p.y, role, label:p.n });
+        state.objects.push({ id: ID(), type:'player', team, x:p.x, y:p.y, role, label:'' });
       }
     };
     if (mode === 'A' || mode === 'both') addTeam('A');
@@ -816,60 +841,42 @@
     commit();
   }
 
-  function rotatePlayers() {
-    // Rotate labels 1..6 within each team (simple: reassign labels by nearest rotation spots)
-    const spotsA = [
-      {x: 2.0, y: 7.8, lab:'1'},
-      {x: 2.0, y: 4.5, lab:'6'},
-      {x: 2.0, y: 1.2, lab:'5'},
-      {x: 6.0, y: 1.2, lab:'4'},
-      {x: 6.0, y: 4.5, lab:'3'},
-      {x: 6.0, y: 7.8, lab:'2'},
-    ];
-    const spotsB = [
-      {x: 16.0, y: 7.8, lab:'1'},
-      {x: 16.0, y: 4.5, lab:'6'},
-      {x: 16.0, y: 1.2, lab:'5'},
-      {x: 12.0, y: 1.2, lab:'4'},
-      {x: 12.0, y: 4.5, lab:'3'},
-      {x: 12.0, y: 7.8, lab:'2'},
-    ];
-    const assign = (team, spots) => {
-      const players = state.objects.filter(o => o.type==='player' && o.team===team);
-      if (players.length === 0) return;
-      // Map player to closest spot
-      const closest = (p) => {
-        let best = null, bestD = Infinity;
-        for (const s of spots) {
-          const dx = p.x - s.x, dy = p.y - s.y;
-          const d = dx*dx + dy*dy;
-          if (d < bestD) { bestD = d; best = s; }
-        }
-        return best;
-      };
-      const map = new Map();
-      for (const p of players) map.set(p.id, closest(p));
+  function rotateTeam(team, dir = 'cw') {
+    const spots = DEFAULT_SPOTS[team];
+    if (!spots) return;
+    const players = state.objects.filter(o => o.type==='player' && o.team===team);
+    if (players.length === 0) return;
 
-      // Extract label mapping and rotate
-      const bySpot = new Map();
-      for (const p of players) {
-        const s = map.get(p.id);
-        const key = s.lab;
-        bySpot.set(key, p);
+    const orderCW = ['1','6','5','4','3','2'];
+    const order = dir === 'ccw' ? [...orderCW].reverse() : orderCW;
+    const spotByLab = new Map(spots.map((s) => [s.n, s]));
+
+    const closest = (p) => {
+      let best = null, bestD = Infinity;
+      for (const s of spots) {
+        const dx = p.x - s.x, dy = p.y - s.y;
+        const d = dx*dx + dy*dy;
+        if (d < bestD) { bestD = d; best = s; }
       }
-      const order = ['1','6','5','4','3','2']; // rotation path for left team when receiving? It's a simple cycle.
-      const nextLabel = {};
-      for (let i=0;i<order.length;i++){
-        const cur = order[i];
-        const nxt = order[(i+1)%order.length];
-        nextLabel[cur] = nxt;
-      }
-      for (const [lab,p] of bySpot.entries()) {
-        p.label = nextLabel[lab] || p.label;
-      }
+      return best;
     };
-    assign('A', spotsA);
-    assign('B', spotsB);
+
+    const playerByLab = new Map();
+    for (const p of players) {
+      const s = closest(p);
+      if (s) playerByLab.set(s.n, p);
+    }
+
+    for (let i = 0; i < order.length; i++) {
+      const curLab = order[i];
+      const nextLab = order[(i + 1) % order.length];
+      const p = playerByLab.get(curLab);
+      const nextSpot = spotByLab.get(nextLab);
+      if (!p || !nextSpot) continue;
+      p.x = nextSpot.x;
+      p.y = nextSpot.y;
+    }
+
     commit();
   }
 
@@ -903,7 +910,10 @@
     setMode(state.mode === MODE.TEXT ? MODE.SELECT : MODE.TEXT);
   });
 
-  $('#btnRotate').addEventListener('click', () => rotatePlayers());
+  $('#btnRotateACW').addEventListener('click', () => rotateTeam('A', 'cw'));
+  $('#btnRotateACCW').addEventListener('click', () => rotateTeam('A', 'ccw'));
+  $('#btnRotateBCW').addEventListener('click', () => rotateTeam('B', 'cw'));
+  $('#btnRotateBCCW').addEventListener('click', () => rotateTeam('B', 'ccw'));
   $('#btnUndo').addEventListener('click', () => { const s = undo(); if (s) replaceState(s); });
   $('#btnRedo').addEventListener('click', () => { const s = redo(); if (s) replaceState(s); });
 
