@@ -13,9 +13,9 @@
 
 
   const LAYOUTS = {
-    'full-h': { id: 'full-h', label: 'Campo intero', view: { x: -1, y: -1, w: 20, h: 11 } },
-    'full-v': { id: 'full-v', label: 'Campo intero (vert.)', view: { x: -1, y: -1, w: 11, h: 20 } },
-    'half': { id: 'half', label: 'Mezzo campo', view: { x: 0, y: 0, w: 9, h: 9 } },
+    'full-h': { id: 'full-h', label: 'Campo intero', view: { x: -2, y: -2, w: 22, h: 13 } },
+    'full-v': { id: 'full-v', label: 'Campo intero (vert.)', view: { x: -2, y: -2, w: 13, h: 22 } },
+    'half': { id: 'half', label: 'Mezzo campo', view: { x: -1, y: -1, w: 11, h: 11 } },
   };
 
   const DEFAULT_STATE = () => ({
@@ -114,6 +114,8 @@
   const chipMode = $('#chipMode');
   const chipZoom = $('#chipZoom');
   const toolGrid = $('#toolGrid');
+  const zoomSlider = $('#zoomSlider');
+  const ENABLE_LONG_PRESS_MENU = false;
 
   // Build SVG
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -281,7 +283,9 @@
     ls.rotation = state.rotation;
     ls.notes = state.notes || '';
     ls.selection = state.selection || null;
-    // ball is now a prop; no per-layout ball state
+    ls.objects = state.objects || [];
+    ls.drawings = state.drawings || [];
+    ls.texts = state.texts || [];
     ls.props = state.props || [];
   }
 
@@ -297,11 +301,12 @@
     const layout = LAYOUTS[state.layout] || LAYOUTS['full-h'];
     const isHalf = state.layout === 'half';
     const baseView = getBaseView();
-    const nextView = isHalf ? { ...layout.view } : v;
+    const nextView = v;
     state.view = nextView;
     svg.setAttribute('viewBox', `${nextView.x} ${nextView.y} ${nextView.w} ${nextView.h}`);
     const zoom = baseView.w / nextView.w;
     chipZoom.textContent = `Zoom: ${Math.round(zoom*100)}%`;
+    if (zoomSlider) zoomSlider.value = String(Math.round(zoom*100));
   }
 
   function applyLayoutTransform() {
@@ -318,7 +323,7 @@
     } else {
       gScene.removeAttribute('transform');
     }
-    gRoot.setAttribute('clip-path', `url(#${isHalf ? 'clipHalf' : 'clipFull'})`);
+    gRoot.removeAttribute('clip-path');
   }
 
   function setLayout(layoutId) {
@@ -353,8 +358,7 @@
   }
 
   function currentCourtBounds() {
-    const isHalf = state.layout === 'half';
-    return { maxX: isHalf ? COURT_W / 2 : COURT_W, maxY: COURT_H };
+    return { maxX: state.view.x + state.view.w, maxY: state.view.y + state.view.h, minX: state.view.x, minY: state.view.y };
   }
 
   function objById(id) {
@@ -414,12 +418,29 @@
       highlight.setAttribute('fill', 'rgba(255,255,255,.25)');
       g.appendChild(highlight);
 
+      const overrideVal = (o.overrideText || '').trim();
       const labelVal = (o.label || '').trim();
       const roleVal = (o.role || '').trim();
       const showBigLabel = labelVal && !roleVal;
       const showBigRole = roleVal && !labelVal;
 
-      if (showBigLabel || showBigRole) {
+      if (overrideVal) {
+        const big = document.createElementNS(svgNS, 'text');
+        big.setAttribute('x', '0');
+        big.setAttribute('y', '0');
+        big.setAttribute('text-anchor', 'middle');
+        big.setAttribute('dominant-baseline', 'middle');
+        big.setAttribute('font-size', '0.32');
+        big.setAttribute('fill', 'rgba(255,255,255,0.96)');
+        big.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+        big.setAttribute('stroke-width', '0.03');
+        big.setAttribute('paint-order', 'stroke');
+        big.setAttribute('font-weight', '700');
+        big.style.pointerEvents = 'none';
+        if (angle || rot) big.setAttribute('transform', `rotate(${-(angle) + rot})`);
+        big.textContent = overrideVal;
+        g.appendChild(big);
+      } else if (showBigLabel || showBigRole) {
         const big = document.createElementNS(svgNS, 'text');
         big.setAttribute('x', '0');
         big.setAttribute('y', '0');
@@ -693,6 +714,7 @@
   }
 
   function renderInspector() {
+    if (inspectorOverlay) inspectorOverlay.style.display = 'none';
     const sel = state.selection ? objById(state.selection) : null;
     inspector.innerHTML = '';
     if (!sel) {
@@ -720,6 +742,11 @@
     inspector.appendChild(typeEl);
 
     if (type === 'player') {
+      const overrideInput = document.createElement('input');
+      overrideInput.value = sel.overrideText || '';
+      overrideInput.addEventListener('input', () => { sel.overrideText = overrideInput.value; commit(); });
+      row('Testo speciale', overrideInput);
+
       const labelInput = document.createElement('input');
       labelInput.value = sel.label || '';
       labelInput.addEventListener('input', () => { sel.label = labelInput.value; commit(); });
@@ -914,8 +941,8 @@
   // Object creation
   function addPlayer(team='A', x= team==='A' ? 4 : 14, y=4.5, label='', role='X') {
     const bounds = currentCourtBounds();
-    const clampedX = clamp(x, 0, bounds.maxX);
-    const clampedY = clamp(y, 0, bounds.maxY);
+    const clampedX = clamp(x, bounds.minX ?? 0, bounds.maxX);
+    const clampedY = clamp(y, bounds.minY ?? 0, bounds.maxY);
     state.objects.push({ id: ID(), type:'player', team, x: clampedX, y: clampedY, role, label });
     commit();
   }
@@ -953,8 +980,8 @@
 
   function addProp(kind, x, y, opts = {}) {
     const bounds = currentCourtBounds();
-    const clampedX = clamp(x, 0, bounds.maxX);
-    const clampedY = clamp(y, 0, bounds.maxY);
+    const clampedX = clamp(x, bounds.minX ?? 0, bounds.maxX);
+    const clampedY = clamp(y, bounds.minY ?? 0, bounds.maxY);
     state.props.push({ id: ID(), type:'prop', kind, x: clampedX, y: clampedY, role: opts.role, color: opts.color });
     commit();
   }
@@ -1223,6 +1250,20 @@
   $('#btnExport').addEventListener('click', () => openExport());
   $('#btnImport').addEventListener('click', () => openImport());
 
+  if (zoomSlider) {
+    zoomSlider.addEventListener('input', () => {
+      const base = getBaseView();
+      const z = clamp(Number(zoomSlider.value) / 100, 0.5, 2);
+      const w = base.w / z;
+      const h = base.h / z;
+      const cx = state.view.x + state.view.w / 2;
+      const cy = state.view.y + state.view.h / 2;
+      setViewBox({ x: cx - w / 2, y: cy - h / 2, w, h });
+      state.view = { x: cx - w / 2, y: cy - h / 2, w, h };
+      commit();
+    });
+  }
+
   // Notes binding
   notesEl.addEventListener('input', () => { state.notes = notesEl.value; commit(); });
 
@@ -1288,48 +1329,162 @@
     addNumberInput.value = '';
   });
 
-  // Context menu dialog
-  const dlgMenu = $('#dlgMenu');
-  const menuGrid = $('#menuGrid');
-  function openMenuForSelection() {
+  // Context menu dropdown
+  function closeContextMenu() {
+    if (!ctxMenu) return;
+    ctxMenu.hidden = true;
+    ctxMenu.innerHTML = '';
+  }
+
+  function openMenuForSelection(clientX, clientY) {
+    if (!ctxMenu) return;
     const sel = state.selection ? objById(state.selection) : null;
-    menuGrid.innerHTML = '';
-    const add = (label, fn, cls='btn') => {
+    ctxMenu.innerHTML = '';
+    ctxMenu.hidden = false;
+
+    const wrapRect = stage.getBoundingClientRect();
+    const left = clamp(clientX - wrapRect.left, 8, wrapRect.width - 8);
+    const top = clamp(clientY - wrapRect.top, 8, wrapRect.height - 8);
+    ctxMenu.style.left = `${left}px`;
+    ctxMenu.style.top = `${top}px`;
+
+    const title = document.createElement('div');
+    title.className = 'menuTitle';
+    title.textContent = sel ? 'Modifica' : 'Azioni';
+    ctxMenu.appendChild(title);
+
+    const row = (label, inputEl) => {
+      const r = document.createElement('div');
+      r.className = 'menuRow';
+      const l = document.createElement('div');
+      l.className = 'menuLabel';
+      l.textContent = label;
+      const w = document.createElement('div');
+      w.appendChild(inputEl);
+      r.appendChild(l);
+      r.appendChild(w);
+      ctxMenu.appendChild(r);
+    };
+
+    const actions = document.createElement('div');
+    actions.className = 'menuActions';
+    const addBtn = (label, fn, cls='btn') => {
       const b = document.createElement('button');
       b.className = cls;
       b.type = 'button';
       b.textContent = label;
-      b.addEventListener('click', () => { fn(); dlgMenu.close(); });
-      menuGrid.appendChild(b);
+      b.addEventListener('click', () => { fn(); closeContextMenu(); });
+      actions.appendChild(b);
     };
+
     if (!sel) {
-      add('Aggiungi giocatore A', () => addPlayer('A', 4, 4.5, ''), 'btn');
-      add('Aggiungi giocatore B', () => addPlayer('B', 14, 4.5, ''), 'btn');
-      add('Aggiungi testo', () => { setMode(MODE.TEXT); }, 'btn');
-      add('Frecce', () => { setMode(MODE.ARROW); }, 'btn');
-      add('Reset', () => replaceState(DEFAULT_STATE()), 'btn btnDanger');
-      dlgMenu.showModal();
+      addBtn('Aggiungi giocatore A', () => addPlayer('A', 4, 4.5, ''), 'btn');
+      addBtn('Aggiungi giocatore B', () => addPlayer('B', 14, 4.5, ''), 'btn');
+      addBtn('Aggiungi testo', () => { setMode(MODE.TEXT); }, 'btn');
+      addBtn('Frecce', () => { setMode(MODE.ARROW); }, 'btn');
+      addBtn('Reset', () => replaceState(DEFAULT_STATE()), 'btn btnDanger');
+      ctxMenu.appendChild(actions);
       return;
     }
+
     if (sel.type === 'player') {
-      add('Duplica', () => { state.objects.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
-      add('Cambia squadra', () => { sel.team = sel.team === 'A' ? 'B' : 'A'; commit(); }, 'btn');
-      add('Elimina', () => removeSelected(), 'btn btnDanger');
+      const overrideInput = document.createElement('input');
+      overrideInput.value = sel.overrideText || '';
+      overrideInput.addEventListener('input', () => { sel.overrideText = overrideInput.value; commit(); });
+      row('Testo speciale', overrideInput);
+
+      const labelInput = document.createElement('input');
+      labelInput.value = sel.label || '';
+      labelInput.addEventListener('input', () => { sel.label = labelInput.value; commit(); });
+      row('Numero', labelInput);
+
+      const roleSel = document.createElement('select');
+      for (const r of ROLES) {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.name;
+        roleSel.appendChild(opt);
+      }
+      roleSel.value = sel.role || 'X';
+      roleSel.addEventListener('change', () => { sel.role = roleSel.value; commit(); });
+      row('Ruolo', roleSel);
+
+      const teamSel = document.createElement('select');
+      for (const t of TEAMS) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        teamSel.appendChild(opt);
+      }
+      teamSel.value = sel.team || 'A';
+      teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
+      row('Squadra', teamSel);
+
+      addBtn('Duplica', () => { state.objects.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
+      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'arrow') {
-      add('Cambia squadra', () => { sel.team = sel.team === 'A' ? 'B' : 'A'; commit(); }, 'btn');
-      add('Elimina', () => removeSelected(), 'btn btnDanger');
+      const teamSel = document.createElement('select');
+      for (const t of TEAMS) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        teamSel.appendChild(opt);
+      }
+      teamSel.value = sel.team || 'A';
+      teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
+      row('Squadra', teamSel);
+
+      const opacity = document.createElement('input');
+      opacity.type = 'number';
+      opacity.min = '0.1';
+      opacity.max = '1';
+      opacity.step = '0.1';
+      opacity.value = sel.style?.opacity ?? 0.9;
+      opacity.addEventListener('input', () => {
+        sel.style = sel.style || {};
+        sel.style.opacity = String(clamp(Number(opacity.value)||0.9, 0.1, 1));
+        commit();
+      });
+      row('Opacità', opacity);
+
+      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'text') {
-      add('Modifica testo', () => {
-        const t = prompt('Testo:', sel.text || '');
-        if (t !== null) { sel.text = t; commit(); }
-      }, 'btn');
-      add('Cambia squadra', () => { sel.team = sel.team === 'A' ? 'B' : 'A'; commit(); }, 'btn');
-      add('Elimina', () => removeSelected(), 'btn btnDanger');
+      const txt = document.createElement('input');
+      txt.value = sel.text || '';
+      txt.addEventListener('input', () => { sel.text = txt.value; commit(); });
+      row('Testo', txt);
+
+      const size = document.createElement('input');
+      size.type = 'number';
+      size.min = '0.2';
+      size.max = '1.2';
+      size.step = '0.05';
+      size.value = sel.style?.size ?? 0.55;
+      size.addEventListener('input', () => {
+        sel.style = sel.style || {};
+        sel.style.size = String(clamp(Number(size.value)||0.55, 0.2, 1.2));
+        commit();
+      });
+      row('Dimensione', size);
+
+      const teamSel = document.createElement('select');
+      for (const t of TEAMS) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        teamSel.appendChild(opt);
+      }
+      teamSel.value = sel.team || 'A';
+      teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
+      row('Squadra', teamSel);
+
+      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'prop') {
-      add('Duplica', () => { state.props.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
-      add('Elimina', () => removeSelected(), 'btn btnDanger');
+      addBtn('Duplica', () => { state.props.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
+      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
     }
-    dlgMenu.showModal();
+
+    ctxMenu.appendChild(actions);
   }
 
   // Interaction: pointer events for drag, arrow drawing, pan
@@ -1361,6 +1516,10 @@
 
   // Draggable inspector overlay
   inspectorHandle.addEventListener('pointerdown', (e) => {
+    if (!ENABLE_LONG_PRESS_MENU) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     inspectorOverlay.setPointerCapture(e.pointerId);
     const wrapRect = stage.getBoundingClientRect();
@@ -1404,6 +1563,7 @@
   }
 
   function startLongPress() {
+    if (!ENABLE_LONG_PRESS_MENU) return;
     clearTimeout(longPressTimer);
     longPressTimer = setTimeout(() => {
       openMenuForSelection();
@@ -1553,15 +1713,10 @@
       const dx = pt.x - drag.start.x;
       const dy = pt.y - drag.start.y;
       const bounds = currentCourtBounds();
-      if (id === 'ball') {
-        state.ball.x = clamp(drag.startObj.x + dx, 0, bounds.maxX);
-        state.ball.y = clamp(drag.startObj.y + dy, 0, bounds.maxY);
-      } else {
-        const obj = objById(id);
-        if (obj) {
-          obj.x = clamp(drag.startObj.x + dx, 0, bounds.maxX);
-          obj.y = clamp(drag.startObj.y + dy, 0, bounds.maxY);
-        }
+      const obj = objById(id);
+      if (obj) {
+        obj.x = clamp(drag.startObj.x + dx, bounds.minX ?? 0, bounds.maxX);
+        obj.y = clamp(drag.startObj.y + dy, bounds.minY ?? 0, bounds.maxY);
       }
       render();
       return;
@@ -1673,7 +1828,18 @@
   // Hit test empty long press to open general menu
   svg.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    openMenuForSelection();
+    const targetId = hitTestTarget(e.target);
+    if (targetId) setSelection(targetId);
+    openMenuForSelection(e.clientX, e.clientY);
+  });
+
+  stage.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
+
+  window.addEventListener('pointerdown', (e) => {
+    if (!ctxMenu || ctxMenu.hidden) return;
+    if (!ctxMenu.contains(e.target)) closeContextMenu();
   });
 
   // Select drawings by clicking them (they are paths)

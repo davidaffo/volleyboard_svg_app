@@ -22,6 +22,10 @@
       <button id="btnRotateACCW" class="btn" title="Ruota squadra A (antiorario)">↺ A</button>
       <button id="btnRotateBCW" class="btn" title="Ruota squadra B (orario)">↻ B</button>
       <button id="btnRotateBCCW" class="btn" title="Ruota squadra B (antiorario)">↺ B</button>
+      <label class="zoomControl" title="Zoom">
+        <span>Zoom</span>
+        <input id="zoomSlider" type="range" min="50" max="200" step="5" value="100" />
+      </label>
       <button id="btnUndo" class="btn" title="Annulla">↶</button>
       <button id="btnRedo" class="btn" title="Ripristina">↷</button>
       <button id="btnReset" class="btn btnDanger" title="Reset">Reset</button>
@@ -60,6 +64,7 @@
           <span class="hint">Drag: sposta oggetti • Pinch/Alt+wheel: zoom • Space+drag: pan • Tap lungo: menu</span>
         </div>
       </div>
+      <div class="ctxMenu" id="ctxMenu" hidden></div>
     </section>
 
     <aside class="side">

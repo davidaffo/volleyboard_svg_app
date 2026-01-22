@@ -40,6 +40,20 @@ body{
 .brand .dot{width:10px;height:10px;border-radius:50%; background:var(--accent); box-shadow:0 0 18px rgba(94,234,212,.5)}
 .brand .title{font-weight:700; letter-spacing:.2px}
 .toolbar{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end}
+.zoomControl{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:12px;
+  background: rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--muted);
+  font-size:12px;
+}
+.zoomControl input[type="range"]{
+  width:120px;
+}
 .btn{
   background:linear-gradient(180deg,var(--btn2),var(--btn));
   border:1px solid rgba(255,255,255,.08);
@@ -225,6 +239,49 @@ body{
   flex-direction:column;
   gap:8px;
   pointer-events:none;
+}
+.ctxMenu{
+  position:absolute;
+  min-width:220px;
+  max-width:320px;
+  background: rgba(17,20,26,.95);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding:10px;
+  z-index:9;
+  backdrop-filter: blur(10px);
+}
+.ctxMenu .menuTitle{
+  font-weight:800;
+  margin-bottom:8px;
+}
+.ctxMenu .menuRow{
+  display:grid;
+  grid-template-columns: 90px 1fr;
+  gap:8px;
+  align-items:center;
+  margin:6px 0;
+}
+.ctxMenu .menuLabel{
+  color:var(--muted);
+  font-size:12px;
+}
+.ctxMenu input,.ctxMenu select{
+  width:100%;
+  background: rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.10);
+  color:var(--text);
+  padding:6px 8px;
+  border-radius:10px;
+  outline:none;
+  font-size:14px;
+}
+.ctxMenu .menuActions{
+  display:flex;
+  gap:8px;
+  margin-top:8px;
+  flex-wrap:wrap;
 }
 .hudRow{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
 .chip{
