@@ -25,12 +25,11 @@
     rotation: 0,
     view: { x: -1, y: -1, w: 20, h: 11 }, // viewBox
     notes: '',
-    layers: { players: true, ball: true, drawings: true, text: true },
+    layers: { players: true, drawings: true, text: true },
     objects: [], // {id,type,team,x,y,role,label,style,...}
     drawings: [], // {id,type,path,team,style}
     texts: [], // {id,type,x,y,text,team,style}
     props: [], // {id,type,kind,x,y,role,color}
-    ball: { id: 'ball', x: 9, y: 4.5, visible: false },
     selection: null,
   });
 
@@ -58,16 +57,18 @@
     { id:'role-O', label:'O', kind:'player', role:'O' },
     { id:'role-S2', label:'S2', kind:'player', role:'S2' },
     { id:'role-C1', label:'C1', kind:'player', role:'C1' },
+    { id:'ball', label:'Palla', kind:'ball' },
     { id:'cone-red', label:'Cinesino rosso', kind:'cone', color:'#ef4444' },
     { id:'cone-yellow', label:'Cinesino giallo', kind:'cone', color:'#f59e0b' },
     { id:'cone-blue', label:'Cinesino blu', kind:'cone', color:'#3b82f6' },
     { id:'cone-green', label:'Cinesino verde', kind:'cone', color:'#10b981' },
-    { id:'ball-cart', label:'Carrello palloni', kind:'ball-cart' },
-    { id:'basket', label:'Canestro', kind:'basket' },
+    { id:'ball-cart', label:'Carrello palloni', kind:'ball-cart', previewScale: 0.8 },
+    { id:'basket', label:'Canestro', kind:'basket', previewScale: 0.8 },
     { id:'coach', label:'Allenatore', kind:'coach' },
-    { id:'ladder', label:'Scaletta', kind:'ladder' },
+    { id:'ladder', label:'Scaletta', kind:'ladder', previewScale: 0.6 },
     { id:'target', label:'Bersaglio', kind:'target' },
   ];
+
 
   // Undo/redo
   const history = [];
@@ -99,7 +100,6 @@
   };
 
   let state = DEFAULT_STATE();
-  let halfInitialized = false;
   state.layoutStates = {};
   ensureLayoutState(state.layout);
   bindLayoutState(state.layout);
@@ -161,8 +161,8 @@
   const gDrawings = document.createElementNS(svgNS, 'g');
   const gProps = document.createElementNS(svgNS, 'g');
   const gPlayers = document.createElementNS(svgNS, 'g');
-  const gBall = document.createElementNS(svgNS, 'g');
   const gText = document.createElementNS(svgNS, 'g');
+  const gHandles = document.createElementNS(svgNS, 'g');
 
   gRoot.setAttribute('id', 'root');
   gScene.setAttribute('id', 'scene');
@@ -170,8 +170,8 @@
   gDrawings.setAttribute('id', 'drawings');
   gProps.setAttribute('id', 'props');
   gPlayers.setAttribute('id', 'players');
-  gBall.setAttribute('id', 'ballLayer');
   gText.setAttribute('id', 'textLayer');
+  gHandles.setAttribute('id', 'handles');
 
   svg.appendChild(gRoot);
   gRoot.appendChild(gScene);
@@ -179,8 +179,8 @@
   gScene.appendChild(gDrawings);
   gScene.appendChild(gProps);
   gScene.appendChild(gPlayers);
-  gScene.appendChild(gBall);
   gScene.appendChild(gText);
+  gScene.appendChild(gHandles);
 
   stage.appendChild(svg);
 
@@ -237,7 +237,6 @@
       drawings: [],
       texts: [],
       props: [],
-      ball: { id: 'ball', x: 9, y: 4.5, visible: false },
       selection: null,
     };
   }
@@ -271,7 +270,7 @@
     state.drawings = ls.drawings || [];
     state.texts = ls.texts || [];
     state.props = ls.props || [];
-    state.ball = ls.ball || { id:'ball', x:9, y:4.5, visible:false };
+    // ball is now a prop; legacy data handled in migrateLegacyBall()
     state.selection = ls.selection || null;
   }
 
@@ -282,7 +281,7 @@
     ls.rotation = state.rotation;
     ls.notes = state.notes || '';
     ls.selection = state.selection || null;
-    ls.ball = state.ball;
+    // ball is now a prop; no per-layout ball state
     ls.props = state.props || [];
   }
 
@@ -326,10 +325,6 @@
     syncLayoutState();
     const layout = LAYOUTS[layoutId] || LAYOUTS['full-h'];
     state.layout = layout.id;
-    if (layoutId === 'half' && !halfInitialized) {
-      state.layoutStates[layoutId] = defaultLayoutState(layoutId);
-      halfInitialized = true;
-    }
     bindLayoutState(layout.id);
     state.view = { ...getBaseView() };
     setViewBox({ ...state.view });
@@ -348,7 +343,6 @@
 
   function applyLayerVisibility() {
     gPlayers.style.display = state.layers.players ? '' : 'none';
-    gBall.style.display = state.layers.ball ? '' : 'none';
     gDrawings.style.display = state.layers.drawings ? '' : 'none';
     gText.style.display = state.layers.text ? '' : 'none';
   }
@@ -365,7 +359,6 @@
 
   function objById(id) {
     if (!id) return null;
-    if (id === 'ball') return state.ball;
     return state.objects.find(o => o.id === id)
       || state.drawings.find(d => d.id === id)
       || state.texts.find(t => t.id === id)
@@ -399,7 +392,9 @@
 
       const g = document.createElementNS(svgNS, 'g');
       g.setAttribute('data-id', o.id);
-      g.setAttribute('transform', `translate(${o.x} ${o.y})`);
+      const rot = o.rotation || 0;
+      const scale = o.scale || 1;
+      g.setAttribute('transform', `translate(${o.x} ${o.y}) rotate(${rot}) scale(${scale})`);
       g.style.color = teamColor(o.team);
       g.style.cursor = 'grab';
 
@@ -437,7 +432,7 @@
         big.setAttribute('paint-order', 'stroke');
         big.setAttribute('font-weight', '700');
         big.style.pointerEvents = 'none';
-        if (angle) big.setAttribute('transform', `rotate(${-angle})`);
+        if (angle || rot) big.setAttribute('transform', `rotate(${-(angle) + rot})`);
         big.textContent = showBigLabel ? labelVal : roleVal;
         g.appendChild(big);
       } else {
@@ -452,7 +447,7 @@
         txt.setAttribute('paint-order', 'stroke');
         txt.setAttribute('font-weight', '700');
         txt.style.pointerEvents = 'none';
-        if (angle) txt.setAttribute('transform', `rotate(${-angle})`);
+        if (angle || rot) txt.setAttribute('transform', `rotate(${-(angle) + rot})`);
         txt.textContent = labelVal;
         g.appendChild(txt);
 
@@ -467,7 +462,7 @@
         role.setAttribute('paint-order', 'stroke');
         role.setAttribute('font-weight', '700');
         role.style.pointerEvents = 'none';
-        if (angle) role.setAttribute('transform', `rotate(${-angle})`);
+        if (angle || rot) role.setAttribute('transform', `rotate(${-(angle) + rot})`);
         role.textContent = roleVal;
         g.appendChild(role);
       }
@@ -509,26 +504,44 @@
       const color = p.color || '#f97316';
       add('polygon', { points:'0,-0.35 0.38,0.28 -0.38,0.28', fill: color, stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
       add('rect', { x:-0.35, y:0.22, width:0.7, height:0.12, rx:0.04, fill:'rgba(0,0,0,0.25)' });
+    } else if (p.kind === 'ball') {
+      add('circle', { cx:0, cy:0, r:0.28, fill:'#f7f1e5', stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
+      add('circle', { cx:-0.12, cy:-0.12, r:0.08, fill:'rgba(255,255,255,0.5)' });
+      const seams = [
+        'M -0.2 -0.1 C -0.05 -0.22 0.1 -0.2 0.2 -0.06',
+        'M -0.2 0.12 C -0.04 0.0 0.12 0.0 0.2 0.14',
+        'M -0.06 -0.24 C 0.04 -0.1 0.04 0.1 -0.04 0.24',
+      ];
+      for (const d of seams) {
+        add('path', { d, fill:'none', stroke:'#d9c7a7', 'stroke-width':0.035, 'stroke-linecap':'round' });
+      }
     } else if (p.kind === 'ball-cart') {
-      add('rect', { x:-0.45, y:-0.25, width:0.9, height:0.5, rx:0.1, fill:'rgba(15,20,28,0.9)', stroke:'rgba(255,255,255,0.2)', 'stroke-width':0.04 });
-      add('circle', { cx:-0.25, cy:0.32, r:0.07, fill:'rgba(255,255,255,0.7)' });
-      add('circle', { cx:0.25, cy:0.32, r:0.07, fill:'rgba(255,255,255,0.7)' });
-      add('circle', { cx:-0.18, cy:-0.05, r:0.12, fill:'rgba(255,255,255,0.9)' });
-      add('circle', { cx:0.1, cy:-0.03, r:0.12, fill:'rgba(255,255,255,0.9)' });
+      add('rect', { x:-0.55, y:-0.15, width:1.1, height:0.45, rx:0.1, fill:'rgba(18,22,30,0.9)', stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
+      add('line', { x1:-0.45, y1:-0.2, x2:-0.15, y2:-0.45, stroke:'rgba(255,255,255,0.35)', 'stroke-width':0.05 });
+      add('line', { x1:0.45, y1:-0.2, x2:0.15, y2:-0.45, stroke:'rgba(255,255,255,0.35)', 'stroke-width':0.05 });
+      add('circle', { cx:-0.25, cy:0.35, r:0.08, fill:'rgba(255,255,255,0.7)' });
+      add('circle', { cx:0.25, cy:0.35, r:0.08, fill:'rgba(255,255,255,0.7)' });
+      add('circle', { cx:-0.2, cy:0.02, r:0.12, fill:'rgba(255,255,255,0.95)' });
+      add('circle', { cx:0.05, cy:-0.02, r:0.12, fill:'rgba(255,255,255,0.95)' });
+      add('circle', { cx:0.25, cy:0.06, r:0.12, fill:'rgba(255,255,255,0.95)' });
     } else if (p.kind === 'basket') {
-      add('rect', { x:-0.45, y:-0.3, width:0.9, height:0.55, rx:0.08, fill:'rgba(18,22,30,0.9)', stroke:'rgba(255,255,255,0.2)', 'stroke-width':0.04 });
-      add('circle', { cx:0, cy:-0.05, r:0.16, fill:'none', stroke:'rgba(244,114,182,0.9)', 'stroke-width':0.06 });
-      add('rect', { x:-0.2, y:0.1, width:0.4, height:0.12, rx:0.04, fill:'rgba(244,114,182,0.35)' });
+      add('line', { x1:0.1, y1:-0.85, x2:0.1, y2:0.55, stroke:'rgba(255,255,255,0.6)', 'stroke-width':0.08 });
+      add('line', { x1:-0.35, y1:-0.75, x2:0.1, y2:-0.75, stroke:'rgba(255,255,255,0.6)', 'stroke-width':0.08 });
+      add('rect', { x:-0.4, y:-0.74, width:0.1, height:0.05, rx:0.02, fill:'rgba(255,255,255,0.7)' });
+      add('path', { d:'M -0.35 -0.7 L -0.2 0.1 L 0.05 0.1 L -0.1 -0.7 Z', fill:'rgba(255,255,255,0.15)', stroke:'rgba(255,255,255,0.35)', 'stroke-width':0.03 });
+      add('rect', { x:-0.55, y:0.55, width:1.1, height:0.15, rx:0.04, fill:'rgba(255,255,255,0.45)' });
     } else if (p.kind === 'coach') {
       add('circle', { cx:0, cy:-0.2, r:0.16, fill:'rgba(255,255,255,0.9)' });
       add('rect', { x:-0.22, y:-0.05, width:0.44, height:0.4, rx:0.12, fill:'rgba(94,234,212,0.9)' });
       add('rect', { x:-0.08, y:0.04, width:0.16, height:0.26, rx:0.03, fill:'rgba(255,255,255,0.95)' });
       add('rect', { x:-0.16, y:0.04, width:0.32, height:0.06, rx:0.03, fill:'rgba(255,255,255,0.95)' });
     } else if (p.kind === 'ladder') {
-      add('rect', { x:-0.5, y:-0.25, width:1.0, height:0.5, rx:0.08, fill:'rgba(0,0,0,0.0)', stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
-      add('line', { x1:-0.35, y1:-0.15, x2:0.35, y2:-0.15, stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
-      add('line', { x1:-0.35, y1:0.0, x2:0.35, y2:0.0, stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
-      add('line', { x1:-0.35, y1:0.15, x2:0.35, y2:0.15, stroke:'rgba(255,255,255,0.25)', 'stroke-width':0.04 });
+      add('rect', { x:-0.2, y:-1.1, width:0.4, height:2.2, rx:0.06, fill:'rgba(255,255,255,0.12)', stroke:'rgba(255,255,255,0.45)', 'stroke-width':0.05 });
+      add('line', { x1:-0.16, y1:-0.8, x2:0.16, y2:-0.8, stroke:'rgba(255,255,255,0.45)', 'stroke-width':0.05 });
+      add('line', { x1:-0.16, y1:-0.45, x2:0.16, y2:-0.45, stroke:'rgba(255,255,255,0.45)', 'stroke-width':0.05 });
+      add('line', { x1:-0.16, y1:-0.1, x2:0.16, y2:-0.1, stroke:'rgba(255,255,255,0.45)', 'stroke-width':0.05 });
+      add('line', { x1:-0.16, y1:0.25, x2:0.16, y2:0.25, stroke:'rgba(255,255,255,0.45)', 'stroke-width':0.05 });
+      add('line', { x1:-0.16, y1:0.6, x2:0.16, y2:0.6, stroke:'rgba(255,255,255,0.45)', 'stroke-width':0.05 });
     } else if (p.kind === 'target') {
       add('circle', { cx:0, cy:0, r:0.28, fill:'none', stroke:'rgba(255,255,255,0.4)', 'stroke-width':0.04 });
       add('circle', { cx:0, cy:0, r:0.14, fill:'rgba(255,255,255,0.2)' });
@@ -537,13 +550,18 @@
 
   function renderProps() {
     gProps.innerHTML = '';
+    const angle = ((state.rotation % 360) + 360) % 360;
     for (const p of state.props) {
       const g = document.createElementNS(svgNS, 'g');
       g.setAttribute('data-id', p.id);
-      g.setAttribute('transform', `translate(${p.x} ${p.y})`);
+      const rot = p.rotation || 0;
+      const scale = p.scale || 1;
+      g.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${rot}) scale(${scale})`);
       g.style.cursor = 'grab';
-      g.setAttribute('transform', `translate(${p.x} ${p.y})`);
-      drawPropShape(g, p);
+      const gInner = document.createElementNS(svgNS, 'g');
+      const counter = -(angle);
+      if (angle || rot) gInner.setAttribute('transform', `rotate(${counter + rot})`);
+      drawPropShape(gInner, p);
 
       if (state.selection === p.id) {
         const sel = document.createElementNS(svgNS, 'circle');
@@ -553,68 +571,12 @@
         sel.setAttribute('fill', 'none');
         sel.setAttribute('stroke', 'rgba(255,255,255,0.6)');
         sel.setAttribute('stroke-width', '0.05');
-        g.appendChild(sel);
+        gInner.appendChild(sel);
       }
 
+      g.appendChild(gInner);
       gProps.appendChild(g);
     }
-  }
-
-  function renderBall() {
-    gBall.innerHTML = '';
-    if (!state.ball.visible) return;
-
-    const g = document.createElementNS(svgNS, 'g');
-    g.setAttribute('data-id', 'ball');
-    g.setAttribute('transform', `translate(${state.ball.x} ${state.ball.y})`);
-    g.style.cursor = 'grab';
-
-    const c = document.createElementNS(svgNS, 'circle');
-    c.setAttribute('cx', '0');
-    c.setAttribute('cy', '0');
-    c.setAttribute('r', '0.28');
-    c.setAttribute('fill', '#f7f1e5');
-    c.setAttribute('stroke', '#cbb48e');
-    c.setAttribute('stroke-width', '0.04');
-    c.setAttribute('stroke', 'rgba(0,0,0,0.25)');
-    c.setAttribute('stroke-width', '0.03');
-    g.appendChild(c);
-
-    const highlight = document.createElementNS(svgNS, 'circle');
-    highlight.setAttribute('cx', '-0.12');
-    highlight.setAttribute('cy', '-0.12');
-    highlight.setAttribute('r', '0.08');
-    highlight.setAttribute('fill', 'rgba(255,255,255,0.5)');
-    g.appendChild(highlight);
-
-    const seams = [
-      'M -0.2 -0.1 C -0.05 -0.22 0.1 -0.2 0.2 -0.06',
-      'M -0.2 0.12 C -0.04 0.0 0.12 0.0 0.2 0.14',
-      'M -0.06 -0.24 C 0.04 -0.1 0.04 0.1 -0.04 0.24',
-    ];
-    for (const d of seams) {
-      const s = document.createElementNS(svgNS, 'path');
-      s.setAttribute('d', d);
-      s.setAttribute('fill', 'none');
-      s.setAttribute('stroke', '#d9c7a7');
-      s.setAttribute('stroke-width', '0.035');
-      s.setAttribute('stroke-linecap', 'round');
-      g.appendChild(s);
-    }
-
-    if (state.selection === 'ball') {
-      const sel = document.createElementNS(svgNS, 'circle');
-      sel.setAttribute('cx', '0');
-      sel.setAttribute('cy', '0');
-      sel.setAttribute('r', '0.36');
-      sel.setAttribute('fill', 'none');
-      sel.setAttribute('stroke', 'rgba(255,255,255,0.65)');
-      sel.setAttribute('stroke-width', '0.06');
-      sel.style.pointerEvents = 'none';
-      g.appendChild(sel);
-    }
-
-    gBall.appendChild(g);
   }
 
   function renderDrawings() {
@@ -639,6 +601,14 @@
       }
 
       gDrawings.appendChild(p);
+      const rot = d.rotation || 0;
+      const scale = d.scale || 1;
+      if (rot !== 0 || scale !== 1) {
+        const box = p.getBBox();
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
+        p.setAttribute('transform', `translate(${cx} ${cy}) rotate(${rot}) scale(${scale}) translate(${-cx} ${-cy})`);
+      }
     }
   }
 
@@ -646,21 +616,25 @@
     gText.innerHTML = '';
     const angle = ((state.rotation % 360) + 360) % 360;
     for (const t of state.texts) {
+      const g = document.createElementNS(svgNS, 'g');
+      g.setAttribute('data-id', t.id);
+      const rot = t.rotation || 0;
+      const scale = t.scale || 1;
+      g.setAttribute('transform', `translate(${t.x} ${t.y}) rotate(${rot}) scale(${scale})`);
+      g.style.cursor = 'grab';
+
       const el = document.createElementNS(svgNS, 'text');
-      el.setAttribute('data-id', t.id);
-      el.setAttribute('x', t.x);
-      el.setAttribute('y', t.y);
+      el.setAttribute('x', '0');
+      el.setAttribute('y', '0');
       el.setAttribute('font-size', t.style?.size ?? '0.55');
       el.setAttribute('fill', 'currentColor');
       el.style.color = teamColor(t.team);
-      el.style.cursor = 'grab';
-      if (angle) el.setAttribute('transform', `rotate(${-angle}, ${t.x}, ${t.y})`);
+      if (angle || rot) el.setAttribute('transform', `rotate(${-(angle) + rot})`);
       el.textContent = t.text;
 
       if (state.selection === t.id) {
         const bb = document.createElementNS(svgNS, 'rect');
-        // We'll add bbox after append
-        gText.appendChild(el);
+        g.appendChild(el);
         const box = el.getBBox();
         bb.setAttribute('x', box.x - 0.2);
         bb.setAttribute('y', box.y - 0.2);
@@ -670,11 +644,52 @@
         bb.setAttribute('stroke', 'rgba(255,255,255,0.55)');
         bb.setAttribute('stroke-width', '0.06');
         bb.style.pointerEvents = 'none';
-        gText.insertBefore(bb, el);
+        g.insertBefore(bb, el);
       } else {
-        gText.appendChild(el);
+        g.appendChild(el);
       }
+      gText.appendChild(g);
     }
+  }
+
+  function elementBBoxInSvg(el) {
+    const rect = el.getBoundingClientRect();
+    const p1 = svgPointFromClient(rect.left, rect.top);
+    const p2 = svgPointFromClient(rect.right, rect.bottom);
+    const x = Math.min(p1.x, p2.x);
+    const y = Math.min(p1.y, p2.y);
+    const w = Math.abs(p2.x - p1.x);
+    const h = Math.abs(p2.y - p1.y);
+    return { x, y, w, h };
+  }
+
+  function renderHandles() {
+    gHandles.innerHTML = '';
+    const id = state.selection;
+    if (!id) return;
+    const el = svg.querySelector(`[data-id="${id}"]`);
+    if (!el) return;
+    const box = elementBBoxInSvg(el);
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    const handle = (x, y, type) => {
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('cx', String(x));
+      c.setAttribute('cy', String(y));
+      c.setAttribute('r', '0.12');
+      c.setAttribute('fill', 'rgba(17,20,26,0.9)');
+      c.setAttribute('stroke', 'rgba(255,255,255,0.7)');
+      c.setAttribute('stroke-width', '0.04');
+      c.setAttribute('data-handle', type);
+      c.setAttribute('data-target', id);
+      c.style.cursor = type === 'rotate' ? 'crosshair' : 'nwse-resize';
+      gHandles.appendChild(c);
+    };
+    handle(box.x, box.y, 'scale');
+    handle(box.x + box.w, box.y, 'scale');
+    handle(box.x, box.y + box.h, 'scale');
+    handle(box.x + box.w, box.y + box.h, 'scale');
+    handle(cx, box.y - 0.4, 'rotate');
   }
 
   function renderInspector() {
@@ -822,7 +837,7 @@
   }
 
   function renderStats() {
-    statObjects.textContent = String(state.objects.length + state.drawings.length + state.texts.length + state.props.length + (state.ball.visible?1:0));
+    statObjects.textContent = String(state.objects.length + state.drawings.length + state.texts.length + state.props.length);
   }
 
   function render() {
@@ -835,8 +850,8 @@
     renderDrawings();
     renderProps();
     renderPlayers();
-    renderBall();
     renderTexts();
+    renderHandles();
     renderInspector();
     renderStats();
   }
@@ -854,12 +869,28 @@
     render();
   }
 
+  function migrateLegacyBall() {
+    const lsMap = state.layoutStates || {};
+    for (const key of Object.keys(lsMap)) {
+      const ls = lsMap[key];
+      if (!ls || !ls.ball) continue;
+      const hasPropBall = Array.isArray(ls.props) && ls.props.some(p => p.kind === 'ball');
+      if (ls.ball.visible && !hasPropBall) {
+        ls.props = Array.isArray(ls.props) ? ls.props : [];
+        ls.props.push({ id: ID(), type:'prop', kind:'ball', x: ls.ball.x ?? 9, y: ls.ball.y ?? 4.5 });
+      }
+      ls.ball.visible = false;
+    }
+    state.props = lsMap[state.layout]?.props || state.props;
+    // legacy ball no longer used
+  }
+
   function replaceState(next) {
     state = next;
     if (!state.layout) state.layout = 'full-h';
     if (!state.rotation && state.rotation !== 0) state.rotation = 0;
     if (!LAYOUTS[state.layout]) state.layout = 'full-h';
-    if (!state.layers) state.layers = { players:true, ball:true, drawings:true, text:true };
+    if (!state.layers) state.layers = { players:true, drawings:true, text:true };
     if (!state.layoutStates) {
       state.layoutStates = {};
       state.layoutStates[state.layout] = {
@@ -870,12 +901,12 @@
         drawings: state.drawings || [],
         texts: state.texts || [],
         props: state.props || [],
-        ball: state.ball || { id:'ball', x:9, y:4.5, visible:false },
         selection: state.selection || null,
       };
     }
     for (const id of Object.keys(LAYOUTS)) ensureLayoutState(id);
     bindLayoutState(state.layout);
+    migrateLegacyBall();
     pushHistory(state);
     render();
   }
@@ -890,9 +921,17 @@
   }
 
   function toggleBall() {
-    state.ball.visible = !state.ball.visible;
-    if (state.ball.visible) state.selection = 'ball';
-    commit();
+    const idx = state.props.findIndex(p => p.kind === 'ball');
+    if (idx >= 0) {
+      state.props.splice(idx, 1);
+      state.selection = null;
+      commit();
+      return;
+    }
+    const bounds = currentCourtBounds();
+    const x = clamp(9, 0, bounds.maxX);
+    const y = clamp(4.5, 0, bounds.maxY);
+    addProp('ball', x, y);
   }
 
   function addTextAt(x,y, text='Testo', team='A') {
@@ -954,7 +993,8 @@
       preview.setAttribute('viewBox', '-1 -1 2 2');
       const g = document.createElementNS(svgNS, 'g');
       const p = { kind: item.kind, role: item.role, color: item.color };
-      g.setAttribute('transform', 'scale(1.1)');
+      const scale = item.previewScale ?? 1.1;
+      g.setAttribute('transform', `scale(${scale})`);
       drawPropShape(g, p);
       preview.appendChild(g);
 
@@ -995,7 +1035,6 @@
     state.drawings = [];
     state.texts = [];
     state.props = [];
-    state.ball = { id:'ball', x:9, y:4.5, visible:false };
     state.selection = null;
     commit();
   }
@@ -1095,7 +1134,6 @@
     addPlayer(team, x, y, '', 'X');
   });
 
-  $('#btnAddBall').addEventListener('click', () => toggleBall());
 
   $('#btnArrow').addEventListener('click', () => {
     setMode(state.mode === MODE.ARROW ? MODE.SELECT : MODE.ARROW);
@@ -1135,7 +1173,6 @@
       drawings: ls.drawings,
       texts: ls.texts,
       props: ls.props,
-      ball: ls.ball,
     };
     ioText.value = JSON.stringify(payload, null, 2);
     btnIOMain.textContent = 'Copia';
@@ -1165,7 +1202,7 @@
         ls.drawings = Array.isArray(next.drawings) ? next.drawings : [];
         ls.texts = Array.isArray(next.texts) ? next.texts : [];
         ls.props = Array.isArray(next.props) ? next.props : [];
-        ls.ball = next.ball || { id:'ball', x:9, y:4.5, visible:false };
+        if (next.ball) ls.ball = next.ball;
         ls.selection = null;
         bindLayoutState(state.layout);
         if (typeof next.rotation === 'number') {
@@ -1291,8 +1328,6 @@
     } else if (sel.type === 'prop') {
       add('Duplica', () => { state.props.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
       add('Elimina', () => removeSelected(), 'btn btnDanger');
-    } else if (sel.id === 'ball') {
-      add(state.ball.visible ? 'Nascondi palla' : 'Mostra palla', () => { state.ball.visible = !state.ball.visible; commit(); }, 'btn');
     }
     dlgMenu.showModal();
   }
@@ -1380,6 +1415,31 @@
     longPressTimer = null;
   }
 
+  gHandles.addEventListener('pointerdown', (e) => {
+    const handle = e.target?.getAttribute?.('data-handle');
+    const targetId = e.target?.getAttribute?.('data-target');
+    if (!handle || !targetId) return;
+    e.stopPropagation();
+    e.preventDefault();
+    gHandles.setPointerCapture(e.pointerId);
+    activePointerId = e.pointerId;
+    const pt = svgPointFromClient(e.clientX, e.clientY);
+    const el = svg.querySelector(`[data-id="${targetId}"]`);
+    if (!el) return;
+    const box = elementBBoxInSvg(el);
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    const obj = objById(targetId) || (targetId === 'ball' ? state.ball : null);
+    if (!obj) return;
+    if (handle === 'rotate') {
+      const startAngle = Math.atan2(pt.y - cy, pt.x - cx) * 180 / Math.PI;
+      drag = { type:'rotate', id: targetId, center:{x:cx,y:cy}, startAngle, startRot: obj.rotation || 0 };
+    } else if (handle === 'scale') {
+      const startDist = Math.hypot(pt.x - cx, pt.y - cy);
+      drag = { type:'scale', id: targetId, center:{x:cx,y:cy}, startDist, startScale: obj.scale || 1 };
+    }
+  });
+
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     svg.setPointerCapture(e.pointerId);
@@ -1433,9 +1493,7 @@
       const obj = objById(targetId);
       if (!obj) return;
       // start drag
-      if (targetId === 'ball') {
-        drag = { type:'move', id:'ball', start: pt, startObj: { x: state.ball.x, y: state.ball.y } };
-      } else if (obj.type === 'player' || obj.type === 'text' || obj.type === 'prop') {
+      if (obj.type === 'player' || obj.type === 'text' || obj.type === 'prop') {
         drag = { type:'move', id: targetId, start: pt, startObj: { x: obj.x, y: obj.y } };
       }
       return;
@@ -1452,6 +1510,24 @@
 
     // cancel long press if moved a bit
     if (longPressTimer && drag) cancelLongPress();
+
+    if (drag?.type === 'rotate' || drag?.type === 'scale') {
+      cancelLongPress();
+      const obj = objById(drag.id) || (drag.id === 'ball' ? state.ball : null);
+      if (!obj) return;
+      const cx = drag.center.x;
+      const cy = drag.center.y;
+      if (drag.type === 'rotate') {
+        const ang = Math.atan2(pt.y - cy, pt.x - cx) * 180 / Math.PI;
+        obj.rotation = (drag.startRot + (ang - drag.startAngle));
+      } else if (drag.type === 'scale') {
+        const dist = Math.max(0.01, Math.hypot(pt.x - cx, pt.y - cy));
+        const next = (dist / Math.max(0.01, drag.startDist)) * drag.startScale;
+        obj.scale = clamp(next, 0.2, 4);
+      }
+      render();
+      return;
+    }
 
     if (drag?.type === 'pan') {
       cancelLongPress();
@@ -1521,6 +1597,7 @@
     if (drag) {
       if (drag.type === 'move') commit();
       if (drag.type === 'pan') commit();
+      if (drag.type === 'rotate' || drag.type === 'scale') commit();
       drag = null;
     }
   });
@@ -1644,12 +1721,30 @@
     state.rotation = state.layoutStates[state.layout]?.rotation ?? defaultRotationFor(state.layout);
   }
 
+  function removePlaceholderTexts() {
+    const isPlaceholder = (t) => (t.text || '') === 'Testo'
+      && (t.team || 'A') === 'A'
+      && (t.style?.size ?? 0.55) === 0.55;
+    let changed = false;
+    const lsMap = state.layoutStates || {};
+    for (const key of Object.keys(lsMap)) {
+      const ls = lsMap[key];
+      if (!Array.isArray(ls.texts)) continue;
+      const before = ls.texts.length;
+      ls.texts = ls.texts.filter((t) => !isPlaceholder(t));
+      if (before !== ls.texts.length) changed = true;
+    }
+    state.texts = lsMap[state.layout]?.texts || state.texts;
+    return changed;
+  }
+
   // Selection / delete with long press via menu
   // Auto-load state
   renderToolbox();
   const loaded = loadLocal();
   if (loaded) {
     resetLayoutRotationsToDefaults();
+    removePlaceholderTexts();
     render();
   } else {
     render();
