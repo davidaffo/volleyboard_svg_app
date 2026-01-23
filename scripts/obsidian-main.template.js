@@ -33,28 +33,21 @@ function buildSrcDoc() {
 
 function waitForApi(iframe) {
   return new Promise((resolve) => {
-    const tryResolve = () => {
+    let tries = 0;
+    const maxTries = 200;
+    const timer = setInterval(() => {
+      tries += 1;
       const win = iframe.contentWindow;
       if (win && win.VOLLEY_API) {
+        clearInterval(timer);
         resolve(win.VOLLEY_API);
-        return true;
+        return;
       }
-      return false;
-    };
-    if (tryResolve()) return;
-    const onLoad = () => {
-      let tries = 0;
-      const timer = setInterval(() => {
-        tries += 1;
-        if (tryResolve()) {
-          clearInterval(timer);
-        } else if (tries > 100) {
-          clearInterval(timer);
-          resolve(null);
-        }
-      }, 50);
-    };
-    iframe.addEventListener('load', onLoad, { once: true });
+      if (tries > maxTries) {
+        clearInterval(timer);
+        resolve(null);
+      }
+    }, 50);
   });
 }
 
@@ -63,6 +56,18 @@ class VolleyBoardPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor('volleyboard', async (source, el, ctx) => {
       el.empty();
       const wrapper = el.createDiv({ cls: 'vb-obsidian-wrapper' });
+      const style = document.createElement('style');
+      style.textContent = `
+        .vb-obsidian-wrapper{display:block;}
+        .vb-snapshot{border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.35);}
+        .vb-snapshot svg{display:block;width:100%;height:auto;}
+        .vb-notes{margin-top:8px;font-size:12px;color:rgba(255,255,255,.7);white-space:pre-wrap;}
+        .vb-error{color:rgba(255,255,255,.75);padding:8px;}
+      `;
+      wrapper.appendChild(style);
+
+      const snap = wrapper.createDiv({ cls: 'vb-snapshot' });
+      const notes = wrapper.createDiv({ cls: 'vb-notes' });
 
       let parsed = null;
       try { parsed = JSON.parse(source.trim() || '{}'); } catch { parsed = null; }
@@ -71,42 +76,97 @@ class VolleyBoardPlugin extends Plugin {
         return;
       }
 
-      const iframe = document.createElement('iframe');
-      iframe.className = 'vb-iframe';
-      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-      iframe.setAttribute('loading', 'lazy');
-      iframe.setAttribute('referrerpolicy', 'no-referrer');
-      iframe.srcdoc = buildSrcDoc();
-      iframe.style.width = '100%';
-      iframe.style.height = '600px';
-      iframe.style.minHeight = '360px';
-      iframe.style.border = '0';
-      iframe.style.borderRadius = '18px';
-      iframe.style.overflow = 'hidden';
-      wrapper.appendChild(iframe);
+      const updateNotes = () => {
+        notes.textContent = (parsed.notes || '').trim();
+        notes.style.display = notes.textContent ? 'block' : 'none';
+      };
+      updateNotes();
 
-      const api = await waitForApi(iframe);
-      if (!api) {
-        wrapper.createEl('div', { text: 'VolleyBoard: impossibile inizializzare.', cls: 'vb-error' });
-        return;
-      }
+      const renderSnapshot = async () => {
+        snap.textContent = '';
+        const iframe = document.createElement('iframe');
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        iframe.setAttribute('loading', 'lazy');
+        iframe.setAttribute('referrerpolicy', 'no-referrer');
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.position = 'absolute';
+        iframe.style.opacity = '0';
+        iframe.style.pointerEvents = 'none';
+        iframe.srcdoc = buildSrcDoc();
+        wrapper.appendChild(iframe);
 
-      api.setState(parsed);
-
-      let saveTimer = null;
-      const scheduleSave = (nextState) => {
-        if (saveTimer) clearTimeout(saveTimer);
-        saveTimer = setTimeout(async () => {
-          try {
-            await this.persistState(ctx, source, nextState);
-          } catch (e) {
-            console.error(e);
-            new Notice('VolleyBoard: impossibile salvare (vedi console)');
-          }
-        }, 250);
+        const api = await waitForApi(iframe);
+        if (!api) {
+          snap.textContent = 'VolleyBoard: errore inizializzazione.';
+          iframe.remove();
+          return;
+        }
+        api.setState(parsed);
+        const svg = api.exportSvg ? api.exportSvg() : '';
+        iframe.remove();
+        if (!svg) {
+          snap.textContent = 'VolleyBoard: snapshot non disponibile.';
+          return;
+        }
+        snap.innerHTML = svg;
       };
 
-      api.subscribe(scheduleSave);
+      await renderSnapshot();
+
+      let editorOpen = false;
+      let editorIframe = null;
+      const openEditor = async () => {
+        if (editorOpen) return;
+        editorOpen = true;
+        snap.style.display = 'none';
+        notes.style.display = 'none';
+
+        const iframe = document.createElement('iframe');
+        editorIframe = iframe;
+        iframe.className = 'vb-iframe';
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        iframe.setAttribute('loading', 'lazy');
+        iframe.setAttribute('referrerpolicy', 'no-referrer');
+        iframe.srcdoc = buildSrcDoc();
+        iframe.style.width = '100%';
+        iframe.style.height = '600px';
+        iframe.style.minHeight = '360px';
+        iframe.style.border = '0';
+        iframe.style.borderRadius = '18px';
+        iframe.style.overflow = 'hidden';
+        wrapper.appendChild(iframe);
+
+        const api = await waitForApi(iframe);
+        if (!api) {
+          wrapper.createEl('div', { text: 'VolleyBoard: impossibile inizializzare.', cls: 'vb-error' });
+          return;
+        }
+
+        api.setState(parsed);
+
+        let saveTimer = null;
+        const scheduleSave = (nextState) => {
+          parsed = nextState;
+          if (saveTimer) clearTimeout(saveTimer);
+          saveTimer = setTimeout(async () => {
+            try {
+              await this.persistState(ctx, source, nextState);
+            } catch (e) {
+              console.error(e);
+              new Notice('VolleyBoard: impossibile salvare (vedi console)');
+            }
+          }, 250);
+        };
+
+        api.subscribe(scheduleSave);
+      };
+
+      wrapper.addEventListener('click', (e) => {
+        if (editorOpen) return;
+        openEditor();
+      });
     });
 
     this.addCommand({

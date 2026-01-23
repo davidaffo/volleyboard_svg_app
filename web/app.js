@@ -1441,6 +1441,23 @@
     }
   }
 
+  function exportSvgString() {
+    const prevSelection = getSelection();
+    if (prevSelection.length) {
+      state.selection = [];
+      render();
+    }
+    const vb = exportViewBox();
+    const width = 1200;
+    const height = Math.round(width * (vb.h / vb.w));
+    const svgString = buildExportSvg(width, height, vb);
+    if (prevSelection.length) {
+      state.selection = prevSelection;
+      render();
+    }
+    return svgString;
+  }
+
   function serializeState() {
     const ls = state.layoutStates?.[state.layout] || defaultLayoutState(state.layout);
     return {
@@ -2389,6 +2406,7 @@
   window.VOLLEY_API = {
     getState: () => serializeState(),
     setState: (next) => applySerializedState(next),
+    exportSvg: () => exportSvgString(),
     subscribe: (fn) => {
       if (typeof fn !== 'function') return () => {};
       changeListeners.add(fn);
