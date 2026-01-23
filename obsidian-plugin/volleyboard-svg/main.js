@@ -75,6 +75,8 @@ class VolleyBoardPlugin extends Plugin {
         wrapper.createEl('div', { text: 'VolleyBoard: JSON non valido.', cls: 'vb-error' });
         return;
       }
+      let savedState = parsed;
+      let draftState = parsed;
 
       const renderSnapshot = async () => {
         snap.textContent = '';
@@ -97,7 +99,7 @@ class VolleyBoardPlugin extends Plugin {
           iframe.remove();
           return;
         }
-        api.setState(parsed);
+        api.setState(savedState);
         const svg = api.exportSvg ? api.exportSvg() : '';
         iframe.remove();
         if (!svg) {
@@ -179,7 +181,7 @@ class VolleyBoardPlugin extends Plugin {
           return;
         }
 
-        api.setState(parsed);
+        api.setState(savedState);
 
         let dirty = false;
         let btnSaveClose = null;
@@ -188,9 +190,8 @@ class VolleyBoardPlugin extends Plugin {
           if (btnSaveClose) btnSaveClose.textContent = dirty ? 'Salva e chiudi*' : 'Salva e chiudi';
         };
 
-        let saveTimer = null;
         const scheduleSave = (nextState) => {
-          parsed = nextState;
+          draftState = nextState;
           setDirty(true);
         };
 
@@ -207,11 +208,13 @@ class VolleyBoardPlugin extends Plugin {
         btnSaveClose.textContent = 'Salva e chiudi';
         btnSaveClose.addEventListener('click', async () => {
           try {
-            const latest = api.getState ? api.getState() : parsed;
-            parsed = latest;
+            const latest = api.getState ? api.getState() : draftState;
+            savedState = latest;
+            parsed = savedState;
           } catch {}
           try {
-            await persistSafe(parsed, false);
+            await persistSafe(savedState, false);
+            setDirty(false);
           } catch (e) {
             console.error(e);
             new Notice('VolleyBoard: impossibile salvare (vedi console)');
@@ -230,6 +233,25 @@ class VolleyBoardPlugin extends Plugin {
           }
         });
         controls.appendChild(btnSaveClose);
+
+        const btnDiscard = document.createElement('button');
+        btnDiscard.textContent = 'Annulla';
+        btnDiscard.addEventListener('click', async () => {
+          if (editorIframe) editorIframe.remove();
+          controls.remove();
+          if (editorLeaf) {
+            editorLeaf.detach();
+            editorLeaf = null;
+          }
+          editorOpen = false;
+          draftState = savedState;
+          setDirty(false);
+          if (wrapper.isConnected) {
+            snap.style.display = '';
+            await renderSnapshot();
+          }
+        });
+        controls.appendChild(btnDiscard);
 
         if (hostEl && hostEl !== wrapper) {
           hostEl.prepend(controls);
