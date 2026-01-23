@@ -1449,7 +1449,7 @@
       render();
     }
     const vb = exportViewBox();
-    const width = 1200;
+    const width = 520;
     const height = Math.round(width * (vb.h / vb.w));
     const svgString = buildExportSvg(width, height, vb);
     if (prevSelection.length) {
