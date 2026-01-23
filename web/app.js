@@ -47,11 +47,18 @@
     { id: 'O', name: 'Opposto (O)' },
     { id: 'S2', name: 'Schiacciatore 2 (S2)' },
     { id: 'C1', name: 'Centrale 1 (C1)' },
+    { id: 'S', name: 'Schiacciatore (S)' },
+    { id: 'C', name: 'Centrale (C)' },
+    { id: 'L', name: 'Libero (L)' },
     { id: 'X', name: 'Altro (X)' },
   ];
 
   const TOOLBOX_ITEMS = [
+    { id:'player-blank', label:'Gioc', kind:'player', role:'NONE' },
     { id:'role-P', label:'P', kind:'player', role:'P' },
+    { id:'role-C', label:'C', kind:'player', role:'C' },
+    { id:'role-S', label:'S', kind:'player', role:'S' },
+    { id:'role-L', label:'L', kind:'player', role:'L' },
     { id:'role-S1', label:'S1', kind:'player', role:'S1' },
     { id:'role-C2', label:'C2', kind:'player', role:'C2' },
     { id:'role-O', label:'O', kind:'player', role:'O' },
@@ -366,7 +373,7 @@
 
   function teamColor(teamId) {
     // Use currentColor on elements; we set style color on group/items
-    return teamId === 'A' ? 'rgba(94,234,212,0.95)' : 'rgba(244,114,182,0.95)';
+    return teamId === 'A' ? 'rgba(30,58,138,0.95)' : 'rgba(153,27,27,0.95)';
   }
 
   function currentCourtBounds() {
@@ -456,7 +463,7 @@
       const base = document.createElementNS(svgNS, 'circle');
       base.setAttribute('cx', '0');
       base.setAttribute('cy', '0');
-      base.setAttribute('r', '0.3');
+      base.setAttribute('r', '0.38');
       base.setAttribute('fill', 'currentColor');
       base.setAttribute('stroke', 'rgba(0,0,0,0.25)');
       base.setAttribute('stroke-width', '0.03');
@@ -465,7 +472,7 @@
       const highlight = document.createElementNS(svgNS, 'circle');
       highlight.setAttribute('cx', '-0.1');
       highlight.setAttribute('cy', '-0.1');
-      highlight.setAttribute('r', '0.045');
+      highlight.setAttribute('r', '0.06');
       highlight.setAttribute('fill', 'rgba(255,255,255,.25)');
       g.appendChild(highlight);
 
@@ -481,7 +488,7 @@
         big.setAttribute('y', '0');
         big.setAttribute('text-anchor', 'middle');
         big.setAttribute('dominant-baseline', 'middle');
-        big.setAttribute('font-size', '0.32');
+        big.setAttribute('font-size', '0.36');
         big.setAttribute('fill', 'rgba(255,255,255,0.96)');
         big.setAttribute('stroke', 'rgba(0,0,0,0.45)');
         big.setAttribute('stroke-width', '0.03');
@@ -497,7 +504,7 @@
         big.setAttribute('y', '0');
         big.setAttribute('text-anchor', 'middle');
         big.setAttribute('dominant-baseline', 'middle');
-        big.setAttribute('font-size', '0.32');
+        big.setAttribute('font-size', '0.36');
         big.setAttribute('fill', 'rgba(255,255,255,0.96)');
         big.setAttribute('stroke', 'rgba(0,0,0,0.45)');
         big.setAttribute('stroke-width', '0.03');
@@ -510,9 +517,9 @@
       } else {
         const txt = document.createElementNS(svgNS, 'text');
         txt.setAttribute('x', '0');
-        txt.setAttribute('y', '-0.06');
+        txt.setAttribute('y', '-0.08');
         txt.setAttribute('text-anchor', 'middle');
-        txt.setAttribute('font-size', '0.23');
+        txt.setAttribute('font-size', '0.26');
         txt.setAttribute('fill', 'rgba(255,255,255,0.96)');
         txt.setAttribute('stroke', 'rgba(0,0,0,0.45)');
         txt.setAttribute('stroke-width', '0.03');
@@ -525,9 +532,9 @@
 
         const role = document.createElementNS(svgNS, 'text');
         role.setAttribute('x', '0');
-        role.setAttribute('y', '0.18');
+        role.setAttribute('y', '0.22');
         role.setAttribute('text-anchor', 'middle');
-        role.setAttribute('font-size', '0.17');
+        role.setAttribute('font-size', '0.20');
         role.setAttribute('fill', 'rgba(255,255,255,0.9)');
         role.setAttribute('stroke', 'rgba(0,0,0,0.45)');
         role.setAttribute('stroke-width', '0.03');
@@ -543,7 +550,7 @@
         const sel = document.createElementNS(svgNS, 'circle');
         sel.setAttribute('cx', '0');
         sel.setAttribute('cy', '0');
-        sel.setAttribute('r', '0.4');
+        sel.setAttribute('r', '0.5');
         sel.setAttribute('fill', 'none');
         sel.setAttribute('stroke', 'rgba(255,255,255,0.65)');
         sel.setAttribute('stroke-width', '0.06');
@@ -564,8 +571,8 @@
     };
 
     if (p.kind === 'player') {
-      add('circle', { cx:0, cy:0, r:0.32, fill:'rgba(94,234,212,0.9)', stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
-      add('circle', { cx:-0.1, cy:-0.1, r:0.05, fill:'rgba(255,255,255,0.25)' });
+      add('circle', { cx:0, cy:0, r:0.38, fill:'rgba(30,58,138,0.95)', stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
+      add('circle', { cx:-0.12, cy:-0.12, r:0.06, fill:'rgba(255,255,255,0.25)' });
     } else if (p.kind === 'role') {
       add('rect', { x:-0.5, y:-0.25, width:1.0, height:0.5, rx:0.12, fill:'rgba(12,16,22,0.75)', stroke:'rgba(255,255,255,0.2)', 'stroke-width':0.04 });
       add('rect', { x:-0.32, y:-0.08, width:0.64, height:0.16, rx:0.06, fill:'rgba(255,255,255,0.12)' });
@@ -659,7 +666,7 @@
       p.setAttribute('d', d.path);
       p.setAttribute('fill', 'none');
       p.setAttribute('stroke', 'currentColor');
-      p.setAttribute('stroke-width', d.style?.width ?? '0.12');
+      p.setAttribute('stroke-width', d.style?.width ?? '0.08');
       p.setAttribute('stroke-linecap', 'round');
       p.setAttribute('stroke-linejoin', 'round');
       p.setAttribute('marker-end', 'url(#arrowHead)');
@@ -668,7 +675,7 @@
       p.setAttribute('opacity', d.style?.opacity ?? '0.9');
 
       if (isSelected(d.id)) {
-        p.setAttribute('stroke-width', '0.18');
+        p.setAttribute('stroke-width', '0.12');
         p.setAttribute('opacity', '1');
       }
 
@@ -1148,7 +1155,8 @@
   function addPlayerFromTool(role, x, y) {
     const sel = primarySelection() ? objById(primarySelection()) : null;
     const team = (sel && sel.team) ? sel.team : 'A';
-    addPlayer(team, x, y, '', role || 'X');
+    const r = role === 'NONE' ? '' : (role || 'X');
+    addPlayer(team, x, y, '', r);
   }
 
   function renderToolbox() {
@@ -1156,6 +1164,7 @@
     toolGrid.innerHTML = '';
     const iconFor = (item) => {
       if (item.kind === 'role') return item.role || 'R';
+      if (item.kind === 'player' && item.role === 'NONE') return 'G';
       if (item.kind === 'ball-cart') return 'CP';
       if (item.kind === 'basket') return 'CAN';
       if (item.kind === 'coach') return 'ALL';
@@ -1950,7 +1959,7 @@
       pathEl.setAttribute('d', `M ${pt.x} ${pt.y} L ${pt.x} ${pt.y}`);
       pathEl.setAttribute('fill', 'none');
       pathEl.setAttribute('stroke', 'currentColor');
-      pathEl.setAttribute('stroke-width', '0.12');
+      pathEl.setAttribute('stroke-width', '0.08');
       pathEl.setAttribute('stroke-linecap', 'round');
       pathEl.setAttribute('stroke-linejoin', 'round');
       pathEl.setAttribute('marker-end', 'url(#arrowHead)');
