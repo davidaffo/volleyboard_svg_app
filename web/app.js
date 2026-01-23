@@ -70,6 +70,17 @@
   ];
 
 
+  const EMBEDDED = !!window.VOLLEY_EMBED;
+  const changeListeners = new Set();
+
+  function emitChange() {
+    if (!changeListeners.size) return;
+    const payload = serializeState();
+    for (const cb of changeListeners) {
+      try { cb(payload); } catch {}
+    }
+  }
+
   // Undo/redo
   const history = [];
   const future = [];
@@ -894,6 +905,7 @@
     syncLayoutState();
     pushHistory(state);
     render();
+    emitChange();
   }
 
   function migrateLegacyBall() {
@@ -1283,16 +1295,9 @@
     }
   }
 
-  // Import/Export dialogs
-  const dlgIO = $('#dlgIO');
-  const dlgTitle = $('#dlgTitle');
-  const ioText = $('#ioText');
-  const btnIOMain = $('#btnIOMain');
-
-  function openExport() {
-    dlgTitle.textContent = 'Export JSON';
+  function serializeState() {
     const ls = state.layoutStates?.[state.layout] || defaultLayoutState(state.layout);
-    const payload = {
+    return {
       version: state.version || 1,
       meta: state.meta || { createdAt: new Date().toISOString() },
       layout: state.layout,
@@ -1305,7 +1310,44 @@
       texts: ls.texts,
       props: ls.props,
     };
-    ioText.value = JSON.stringify(payload, null, 2);
+  }
+
+  function applySerializedState(next) {
+    if (!next || typeof next !== 'object') return;
+    if (next.layout && LAYOUTS[next.layout]) {
+      syncLayoutState();
+      state.layout = next.layout;
+      bindLayoutState(state.layout);
+      updateLayoutTabs();
+    }
+    ensureLayoutState(state.layout);
+    const ls = state.layoutStates[state.layout];
+    ls.view = next.view || { ...(LAYOUTS[state.layout]?.view || LAYOUTS['full-h'].view) };
+    ls.notes = next.notes || '';
+    ls.objects = Array.isArray(next.objects) ? next.objects : [];
+    ls.drawings = Array.isArray(next.drawings) ? next.drawings : [];
+    ls.texts = Array.isArray(next.texts) ? next.texts : [];
+    ls.props = Array.isArray(next.props) ? next.props : [];
+    if (next.ball) ls.ball = next.ball;
+    ls.selection = null;
+    bindLayoutState(state.layout);
+    if (typeof next.rotation === 'number') {
+      state.rotation = ((next.rotation % 360) + 360) % 360;
+      ls.rotation = state.rotation;
+    }
+    if (next.layers) state.layers = next.layers;
+    commit();
+  }
+
+  // Import/Export dialogs
+  const dlgIO = $('#dlgIO');
+  const dlgTitle = $('#dlgTitle');
+  const ioText = $('#ioText');
+  const btnIOMain = $('#btnIOMain');
+
+  function openExport() {
+    dlgTitle.textContent = 'Export JSON';
+    ioText.value = JSON.stringify(serializeState(), null, 2);
     btnIOMain.textContent = 'Copia';
     btnIOMain.onclick = async (e) => {
       e.preventDefault();
@@ -1325,23 +1367,7 @@
       e.preventDefault();
       try {
         const next = JSON.parse(ioText.value);
-        ensureLayoutState(state.layout);
-        const ls = state.layoutStates[state.layout];
-        ls.view = next.view || { ...(LAYOUTS[state.layout]?.view || LAYOUTS['full-h'].view) };
-        ls.notes = next.notes || '';
-        ls.objects = Array.isArray(next.objects) ? next.objects : [];
-        ls.drawings = Array.isArray(next.drawings) ? next.drawings : [];
-        ls.texts = Array.isArray(next.texts) ? next.texts : [];
-        ls.props = Array.isArray(next.props) ? next.props : [];
-        if (next.ball) ls.ball = next.ball;
-        ls.selection = null;
-        bindLayoutState(state.layout);
-        if (typeof next.rotation === 'number') {
-          state.rotation = ((next.rotation % 360) + 360) % 360;
-          ls.rotation = state.rotation;
-        }
-        if (next.layers) state.layers = next.layers;
-        commit();
+        applySerializedState(next);
         dlgIO.close();
       } catch (err) {
         alert('JSON non valido');
@@ -1981,8 +2007,10 @@
       return true;
     } catch { return false; }
   }
-  window.addEventListener('beforeunload', saveLocal);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveLocal(); });
+  if (!EMBEDDED) {
+    window.addEventListener('beforeunload', saveLocal);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveLocal(); });
+  }
 
   function resetLayoutRotationsToDefaults() {
     if (!state.layoutStates) return;
@@ -2012,7 +2040,7 @@
   // Selection / delete with long press via menu
   // Auto-load state
   renderToolbox();
-  const loaded = loadLocal();
+  const loaded = EMBEDDED ? false : loadLocal();
   if (loaded) {
     resetLayoutRotationsToDefaults();
     removePlaceholderTexts();
@@ -2024,5 +2052,17 @@
 
   // Auto commit after first render to have baseline
   pushHistory(state);
+
+  window.VOLLEY_API = {
+    getState: () => serializeState(),
+    setState: (next) => applySerializedState(next),
+    subscribe: (fn) => {
+      if (typeof fn !== 'function') return () => {};
+      changeListeners.add(fn);
+      return () => changeListeners.delete(fn);
+    },
+  };
+  window.VOLLEY_READY = true;
+  try { window.dispatchEvent(new Event('volleyboard-ready')); } catch {}
 
 })();
