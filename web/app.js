@@ -1072,6 +1072,7 @@
     if (!state.rotation && state.rotation !== 0) state.rotation = 0;
     if (!LAYOUTS[state.layout]) state.layout = 'full-h';
     if (!state.layers) state.layers = { players:true, drawings:true, text:true };
+    if (!state.mode) state.mode = MODE.SELECT;
     state.selection = normalizeSelection(state.selection);
     if (!state.layoutStates) {
       state.layoutStates = {};
@@ -1775,6 +1776,7 @@
   let drag = null; // {id, startX,startY, objStartX,objStartY}
   let arrowDraft = null; // {team, start, cur, pathEl}
   let selectionBox = null;
+  const DRAG_SELECT_PX = 6;
   let longPressTimer = null;
   let spaceDown = false;
   let overlayDrag = null;
@@ -1966,7 +1968,10 @@
           return;
         }
       }
-      setSelection(targetId);
+      if (!isSel) {
+        drag = { type:'pending-select', id: targetId, start: pt, startClientX: e.clientX, startClientY: e.clientY };
+        return;
+      }
       const obj = objById(targetId);
       if (!obj) return;
       // start drag
@@ -2077,6 +2082,26 @@
       return;
     }
 
+    if (drag?.type === 'pending-select') {
+      cancelLongPress();
+      const dx = e.clientX - drag.startClientX;
+      const dy = e.clientY - drag.startClientY;
+      const dist = Math.hypot(dx, dy);
+      if (dist >= DRAG_SELECT_PX) {
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('fill', 'rgba(94,234,212,0.12)');
+        rect.setAttribute('stroke', 'rgba(94,234,212,0.7)');
+        rect.setAttribute('stroke-width', '0.05');
+        rect.setAttribute('stroke-dasharray', '0.18 0.12');
+        rect.style.pointerEvents = 'none';
+        gHandles.appendChild(rect);
+        selectionBox = { start: drag.start, rectEl: rect, additive: false };
+        drag = { type:'selectbox', start: drag.start, additive: false };
+        updateSelectionRect(rect, drag.start, pt);
+      }
+      return;
+    }
+
     if (arrowDraft) {
       arrowDraft.cur = pt;
       const mx = (arrowDraft.start.x + pt.x) / 2;
@@ -2123,6 +2148,12 @@
     cancelLongPress();
     svg.releasePointerCapture(e.pointerId);
     activePointerId = null;
+
+    if (drag?.type === 'pending-select') {
+      setSelection(drag.id);
+      drag = null;
+      return;
+    }
 
     if (drag?.type === 'selectbox' && selectionBox) {
       const pt = svgPointFromClient(e.clientX, e.clientY);
