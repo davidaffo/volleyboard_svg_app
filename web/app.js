@@ -136,6 +136,7 @@
   svg.setAttribute('height', '100%');
   svg.setAttribute('viewBox', `${state.view.x} ${state.view.y} ${state.view.w} ${state.view.h}`);
   svg.setAttribute('role', 'img');
+  svg.setAttribute('tabindex', '0');
   svg.style.touchAction = 'none';
 
   const defs = document.createElementNS(svgNS, 'defs');
@@ -1923,6 +1924,7 @@
 
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    svg.focus();
     svg.setPointerCapture(e.pointerId);
     activePointerId = e.pointerId;
 

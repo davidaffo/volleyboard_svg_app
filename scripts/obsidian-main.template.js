@@ -59,10 +59,11 @@ class VolleyBoardPlugin extends Plugin {
       const style = document.createElement('style');
       style.textContent = `
         .vb-obsidian-wrapper{display:block;}
-        .vb-snapshot{border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.35);}
-        .vb-snapshot svg{display:block;width:100%;height:auto;}
+        .vb-snapshot{border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.35);max-height:360px;}
+        .vb-snapshot svg{display:block;width:100%;height:auto;max-height:360px;}
         .vb-notes{margin-top:8px;font-size:12px;color:rgba(255,255,255,.7);white-space:pre-wrap;}
         .vb-error{color:rgba(255,255,255,.75);padding:8px;}
+        .vb-editor-frame{width:100%;height:100%;border:0;border-radius:0;}
       `;
       wrapper.appendChild(style);
 
@@ -117,18 +118,29 @@ class VolleyBoardPlugin extends Plugin {
 
         const iframe = document.createElement('iframe');
         editorIframe = iframe;
-        iframe.className = 'vb-iframe';
+        iframe.className = 'vb-editor-frame';
         iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
         iframe.setAttribute('loading', 'lazy');
         iframe.setAttribute('referrerpolicy', 'no-referrer');
         iframe.srcdoc = buildSrcDoc();
-        iframe.style.width = '100%';
-        iframe.style.height = '600px';
-        iframe.style.minHeight = '360px';
-        iframe.style.border = '0';
-        iframe.style.borderRadius = '18px';
-        iframe.style.overflow = 'hidden';
-        wrapper.appendChild(iframe);
+
+        let hostEl = null;
+        const popout = this.app.workspace.getLeaf?.('window');
+        if (popout) {
+          await popout.setViewState({ type: 'empty', state: {} });
+          hostEl = popout.view.containerEl;
+          hostEl.empty();
+          hostEl.style.padding = '0';
+          hostEl.style.margin = '0';
+          hostEl.style.width = '100vw';
+          hostEl.style.height = '100vh';
+          hostEl.style.display = 'flex';
+          hostEl.style.flexDirection = 'column';
+          iframe.style.flex = '1 1 auto';
+        } else {
+          hostEl = wrapper;
+        }
+        hostEl.appendChild(iframe);
 
         const api = await waitForApi(iframe);
         if (!api) {
