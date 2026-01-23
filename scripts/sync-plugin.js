@@ -23,9 +23,9 @@ let body = bodyMatch[1];
 body = body.replace(/<script[\s\S]*?<\/script>/gi, '').trim();
 
 const filled = template
-  .replace('__WEB_HTML__', JSON.stringify(body))
-  .replace('__WEB_CSS__', JSON.stringify(css))
-  .replace('__WEB_JS__', JSON.stringify(js));
+  .replace('__WEB_HTML__', () => JSON.stringify(body))
+  .replace('__WEB_CSS__', () => JSON.stringify(css))
+  .replace('__WEB_JS__', () => JSON.stringify(js));
 
 fs.writeFileSync(path.join(pluginDir, 'main.js'), filled, 'utf8');
 

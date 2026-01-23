@@ -67,7 +67,6 @@ class VolleyBoardPlugin extends Plugin {
       wrapper.appendChild(style);
 
       const snap = wrapper.createDiv({ cls: 'vb-snapshot' });
-      const notes = wrapper.createDiv({ cls: 'vb-notes' });
 
       let parsed = null;
       try { parsed = JSON.parse(source.trim() || '{}'); } catch { parsed = null; }
@@ -75,12 +74,6 @@ class VolleyBoardPlugin extends Plugin {
         wrapper.createEl('div', { text: 'VolleyBoard: JSON non valido.', cls: 'vb-error' });
         return;
       }
-
-      const updateNotes = () => {
-        notes.textContent = (parsed.notes || '').trim();
-        notes.style.display = notes.textContent ? 'block' : 'none';
-      };
-      updateNotes();
 
       const renderSnapshot = async () => {
         snap.textContent = '';
@@ -121,7 +114,6 @@ class VolleyBoardPlugin extends Plugin {
         if (editorOpen) return;
         editorOpen = true;
         snap.style.display = 'none';
-        notes.style.display = 'none';
 
         const iframe = document.createElement('iframe');
         editorIframe = iframe;
