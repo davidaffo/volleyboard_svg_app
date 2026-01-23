@@ -130,20 +130,20 @@
   const defs = document.createElementNS(svgNS, 'defs');
   defs.innerHTML = `
     <linearGradient id="bgFullH" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f1f2b"></stop>
-      <stop offset="100%" stop-color="#0b1218"></stop>
+      <stop offset="0%" stop-color="#f6a12a"></stop>
+      <stop offset="100%" stop-color="#db6b06"></stop>
     </linearGradient>
     <linearGradient id="bgFullV" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0%" stop-color="#1a1f1a"></stop>
-      <stop offset="100%" stop-color="#0e1410"></stop>
+      <stop offset="0%" stop-color="#f2a136"></stop>
+      <stop offset="100%" stop-color="#d46305"></stop>
     </linearGradient>
     <linearGradient id="bgHalfH" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#1d1612"></stop>
-      <stop offset="100%" stop-color="#0e0b0a"></stop>
+      <stop offset="0%" stop-color="#f4a738"></stop>
+      <stop offset="100%" stop-color="#d76a08"></stop>
     </linearGradient>
     <linearGradient id="bgHalfV" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#121625"></stop>
-      <stop offset="100%" stop-color="#0b0e19"></stop>
+      <stop offset="0%" stop-color="#f6a73e"></stop>
+      <stop offset="100%" stop-color="#d06005"></stop>
     </linearGradient>
     <clipPath id="clipFull" clipPathUnits="userSpaceOnUse">
       <rect x="0" y="0" width="18" height="9" rx="0.4"></rect>
@@ -206,20 +206,20 @@
 
     // Background
     court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, rx: 0.4, fill: `url(#${bgId})` });
-    court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, rx: 0.4, fill: 'rgba(255,255,255,0.03)' });
+    court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, rx: 0.4, fill: 'rgba(255,255,255,0.04)' });
     // Border
-    court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, fill: 'none', stroke: 'rgba(255,255,255,0.20)', 'stroke-width': 0.08 });
+    court('rect', { x: 0, y: 0, width: courtW, height: COURT_H, fill: 'none', stroke: 'rgba(255,255,255,0.9)', 'stroke-width': 0.08 });
 
     // Net (midline for full court, boundary for half court)
     if (!isHalf) {
-      court('line', { x1: netX, y1: 0, x2: netX, y2: COURT_H, stroke: 'rgba(255,255,255,0.20)', 'stroke-width': 0.08 });
+      court('line', { x1: netX, y1: 0, x2: netX, y2: COURT_H, stroke: 'rgba(255,255,255,0.9)', 'stroke-width': 0.08 });
     }
-    court('rect', { x: netX - 0.06, y: 0, width: 0.12, height: COURT_H, fill: 'rgba(94,234,212,0.10)' });
+    court('rect', { x: netX - 0.06, y: 0, width: 0.12, height: COURT_H, fill: 'rgba(255,255,255,0.12)' });
 
     // 3m lines (3m from net)
-    court('line', { x1: netX - 3, y1: 0, x2: netX - 3, y2: COURT_H, stroke: 'rgba(255,255,255,0.14)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
+    court('line', { x1: netX - 3, y1: 0, x2: netX - 3, y2: COURT_H, stroke: 'rgba(255,255,255,0.9)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
     if (!isHalf) {
-      court('line', { x1: netX + 3, y1: 0, x2: netX + 3, y2: COURT_H, stroke: 'rgba(255,255,255,0.14)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
+      court('line', { x1: netX + 3, y1: 0, x2: netX + 3, y2: COURT_H, stroke: 'rgba(255,255,255,0.9)', 'stroke-width': 0.06, 'stroke-dasharray': '0.25 0.25' });
     }
   }
 
@@ -1179,6 +1179,110 @@
 
   $('#btnReset').addEventListener('click', () => { replaceState(DEFAULT_STATE()); });
 
+  function exportFilename(ext) {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+    return `volleyboard_${state.layout}_${stamp}.${ext}`;
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportViewBox() {
+    return { ...getBaseView() };
+  }
+
+  function buildExportSvg(width, height, viewBox) {
+    const clone = svg.cloneNode(true);
+    const handles = clone.querySelector('#handles');
+    if (handles) handles.remove();
+    let defsEl = clone.querySelector('defs');
+    if (!defsEl) {
+      defsEl = document.createElementNS(svgNS, 'defs');
+      clone.insertBefore(defsEl, clone.firstChild);
+    }
+    if (!defsEl.querySelector('#exportBg')) {
+      const exportBg = document.createElementNS(svgNS, 'linearGradient');
+      exportBg.setAttribute('id', 'exportBg');
+      exportBg.setAttribute('x1', '0');
+      exportBg.setAttribute('y1', '0');
+      exportBg.setAttribute('x2', '0');
+      exportBg.setAttribute('y2', '1');
+      exportBg.innerHTML = `
+        <stop offset="0%" stop-color="#2d9848"></stop>
+        <stop offset="100%" stop-color="#1f502c"></stop>
+      `;
+      defsEl.appendChild(exportBg);
+    }
+    const bgRect = document.createElementNS(svgNS, 'rect');
+    bgRect.setAttribute('x', String(viewBox.x));
+    bgRect.setAttribute('y', String(viewBox.y));
+    bgRect.setAttribute('width', String(viewBox.w));
+    bgRect.setAttribute('height', String(viewBox.h));
+    bgRect.setAttribute('fill', 'url(#exportBg)');
+    clone.insertBefore(bgRect, clone.firstChild);
+    clone.setAttribute('xmlns', svgNS);
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clone.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+    clone.setAttribute('width', String(width));
+    clone.setAttribute('height', String(height));
+    return new XMLSerializer().serializeToString(clone);
+  }
+
+  function getExportSize(viewBox) {
+    const baseW = Math.max(1, svg.clientWidth);
+    const scale = 2;
+    let width = Math.round(baseW * scale);
+    let height = Math.round(width * (viewBox.h / viewBox.w));
+    const maxDim = 4096;
+    if (Math.max(width, height) > maxDim) {
+      const k = maxDim / Math.max(width, height);
+      width = Math.round(width * k);
+      height = Math.round(height * k);
+    }
+    return { width, height };
+  }
+
+  async function exportPng() {
+    const prevSelection = state.selection;
+    if (prevSelection) {
+      state.selection = null;
+      render();
+    }
+    const vb = exportViewBox();
+    const { width, height } = getExportSize(vb);
+    const svgString = buildExportSvg(width, height, vb);
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (blob) downloadBlob(blob, exportFilename('png'));
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+    if (prevSelection) {
+      state.selection = prevSelection;
+      render();
+    }
+  }
+
   // Import/Export dialogs
   const dlgIO = $('#dlgIO');
   const dlgTitle = $('#dlgTitle');
@@ -1249,6 +1353,7 @@
 
   $('#btnExport').addEventListener('click', () => openExport());
   $('#btnImport').addEventListener('click', () => openImport());
+  $('#btnExportImg').addEventListener('click', () => exportPng());
 
   if (zoomSlider) {
     zoomSlider.addEventListener('input', () => {
