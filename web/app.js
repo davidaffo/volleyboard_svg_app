@@ -30,7 +30,7 @@
     drawings: [], // {id,type,path,team,style}
     texts: [], // {id,type,x,y,text,team,style}
     props: [], // {id,type,kind,x,y,role,color}
-    selection: null,
+    selection: [],
   });
 
   const ID = () => 'id_' + Math.random().toString(16).slice(2) + '_' + Date.now().toString(16);
@@ -250,7 +250,7 @@
       drawings: [],
       texts: [],
       props: [],
-      selection: null,
+      selection: [],
     };
   }
 
@@ -284,7 +284,7 @@
     state.texts = ls.texts || [];
     state.props = ls.props || [];
     // ball is now a prop; legacy data handled in migrateLegacyBall()
-    state.selection = ls.selection || null;
+    state.selection = normalizeSelection(ls.selection);
   }
 
   function syncLayoutState() {
@@ -293,7 +293,7 @@
     ls.view = state.view;
     ls.rotation = state.rotation;
     ls.notes = state.notes || '';
-    ls.selection = state.selection || null;
+    ls.selection = normalizeSelection(state.selection);
     ls.objects = state.objects || [];
     ls.drawings = state.drawings || [];
     ls.texts = state.texts || [];
@@ -380,11 +380,50 @@
       || state.props.find(p => p.id === id);
   }
 
-  function setSelection(id) {
-    state.selection = id;
+  function normalizeSelection(sel) {
+    if (Array.isArray(sel)) return sel.filter(Boolean);
+    if (sel) return [sel];
+    return [];
+  }
+
+  function getSelection() {
+    return normalizeSelection(state.selection);
+  }
+
+  function setSelection(ids) {
+    const next = Array.from(new Set(normalizeSelection(ids)));
+    state.selection = next;
     const ls = state.layoutStates?.[state.layout];
-    if (ls) ls.selection = id;
+    if (ls) ls.selection = next;
     render();
+  }
+
+  function clearSelection() {
+    setSelection([]);
+  }
+
+  function toggleSelection(id) {
+    if (!id) return;
+    const sel = new Set(getSelection());
+    if (sel.has(id)) sel.delete(id);
+    else sel.add(id);
+    setSelection([...sel]);
+  }
+
+  function isSelected(id) {
+    return getSelection().includes(id);
+  }
+
+  function primarySelection() {
+    const sel = getSelection();
+    return sel.length ? sel[sel.length - 1] : null;
+  }
+
+  function getTransformableSelection() {
+    return getSelection()
+      .map((id) => objById(id))
+      .filter((o) => o && (o.type === 'player' || o.type === 'text' || o.type === 'prop'))
+      .map((o) => ({ id: o.id, x: o.x, y: o.y, rotation: o.rotation || 0, scale: o.scale || 1 }));
   }
 
   function svgPointFromClient(clientX, clientY) {
@@ -499,7 +538,7 @@
         g.appendChild(role);
       }
 
-      if (state.selection === o.id) {
+      if (isSelected(o.id)) {
         const sel = document.createElementNS(svgNS, 'circle');
         sel.setAttribute('cx', '0');
         sel.setAttribute('cy', '0');
@@ -595,7 +634,7 @@
       if (angle || rot) gInner.setAttribute('transform', `rotate(${counter + rot})`);
       drawPropShape(gInner, p);
 
-      if (state.selection === p.id) {
+      if (isSelected(p.id)) {
         const sel = document.createElementNS(svgNS, 'circle');
         sel.setAttribute('cx', '0');
         sel.setAttribute('cy', '0');
@@ -627,7 +666,7 @@
       p.style.cursor = 'pointer';
       p.setAttribute('opacity', d.style?.opacity ?? '0.9');
 
-      if (state.selection === d.id) {
+      if (isSelected(d.id)) {
         p.setAttribute('stroke-width', '0.18');
         p.setAttribute('opacity', '1');
       }
@@ -664,7 +703,7 @@
       if (angle || rot) el.setAttribute('transform', `rotate(${-(angle) + rot})`);
       el.textContent = t.text;
 
-      if (state.selection === t.id) {
+      if (isSelected(t.id)) {
         const bb = document.createElementNS(svgNS, 'rect');
         g.appendChild(el);
         const box = el.getBBox();
@@ -695,13 +734,100 @@
     return { x, y, w, h };
   }
 
+  function selectionBounds(ids) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let found = false;
+    for (const id of ids) {
+      const el = svg.querySelector(`[data-id="${id}"]`);
+      if (!el) continue;
+      const box = elementBBoxInSvg(el);
+      if (!Number.isFinite(box.x)) continue;
+      found = true;
+      minX = Math.min(minX, box.x);
+      minY = Math.min(minY, box.y);
+      maxX = Math.max(maxX, box.x + box.w);
+      maxY = Math.max(maxY, box.y + box.h);
+    }
+    if (!found) return null;
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+
+  function updateSelectionRect(rectEl, start, cur) {
+    const x = Math.min(start.x, cur.x);
+    const y = Math.min(start.y, cur.y);
+    const w = Math.abs(cur.x - start.x);
+    const h = Math.abs(cur.y - start.y);
+    rectEl.setAttribute('x', String(x));
+    rectEl.setAttribute('y', String(y));
+    rectEl.setAttribute('width', String(w));
+    rectEl.setAttribute('height', String(h));
+    return { x, y, w, h };
+  }
+
+  function idsInRect(rect) {
+    const ids = [];
+    const elements = svg.querySelectorAll('[data-id]');
+    elements.forEach((el) => {
+      const id = el.getAttribute('data-id');
+      if (!id) return;
+      const box = elementBBoxInSvg(el);
+      const intersects = !(
+        box.x > rect.x + rect.w ||
+        box.x + box.w < rect.x ||
+        box.y > rect.y + rect.h ||
+        box.y + box.h < rect.y
+      );
+      if (intersects) ids.push(id);
+    });
+    return ids;
+  }
+
   function renderHandles() {
     gHandles.innerHTML = '';
-    const id = state.selection;
-    if (!id) return;
-    const el = svg.querySelector(`[data-id="${id}"]`);
-    if (!el) return;
-    const box = elementBBoxInSvg(el);
+    const selIds = getSelection();
+    if (!selIds.length) return;
+    if (selIds.length === 1) {
+      const id = selIds[0];
+      const el = svg.querySelector(`[data-id="${id}"]`);
+      if (!el) return;
+      const box = elementBBoxInSvg(el);
+      const cx = box.x + box.w / 2;
+      const cy = box.y + box.h / 2;
+      const handle = (x, y, type) => {
+        const c = document.createElementNS(svgNS, 'circle');
+        c.setAttribute('cx', String(x));
+        c.setAttribute('cy', String(y));
+        c.setAttribute('r', '0.12');
+        c.setAttribute('fill', 'rgba(17,20,26,0.9)');
+        c.setAttribute('stroke', 'rgba(255,255,255,0.7)');
+        c.setAttribute('stroke-width', '0.04');
+        c.setAttribute('data-handle', type);
+        c.setAttribute('data-target', id);
+        c.style.cursor = type === 'rotate' ? 'crosshair' : 'nwse-resize';
+        gHandles.appendChild(c);
+      };
+      handle(box.x, box.y, 'scale');
+      handle(box.x + box.w, box.y, 'scale');
+      handle(box.x, box.y + box.h, 'scale');
+      handle(box.x + box.w, box.y + box.h, 'scale');
+      handle(cx, box.y - 0.4, 'rotate');
+      return;
+    }
+
+    const box = selectionBounds(selIds);
+    if (!box) return;
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', String(box.x));
+    rect.setAttribute('y', String(box.y));
+    rect.setAttribute('width', String(box.w));
+    rect.setAttribute('height', String(box.h));
+    rect.setAttribute('fill', 'none');
+    rect.setAttribute('stroke', 'rgba(255,255,255,0.55)');
+    rect.setAttribute('stroke-width', '0.05');
+    rect.setAttribute('stroke-dasharray', '0.18 0.12');
+    rect.style.pointerEvents = 'none';
+    gHandles.appendChild(rect);
+
     const cx = box.x + box.w / 2;
     const cy = box.y + box.h / 2;
     const handle = (x, y, type) => {
@@ -713,7 +839,7 @@
       c.setAttribute('stroke', 'rgba(255,255,255,0.7)');
       c.setAttribute('stroke-width', '0.04');
       c.setAttribute('data-handle', type);
-      c.setAttribute('data-target', id);
+      c.setAttribute('data-target', '__group__');
       c.style.cursor = type === 'rotate' ? 'crosshair' : 'nwse-resize';
       gHandles.appendChild(c);
     };
@@ -726,8 +852,24 @@
 
   function renderInspector() {
     if (inspectorOverlay) inspectorOverlay.style.display = 'none';
-    const sel = state.selection ? objById(state.selection) : null;
     inspector.innerHTML = '';
+    const selIds = getSelection();
+    if (!selIds.length) {
+      inspector.innerHTML = `<div class="muted">Nessuna selezione</div>`;
+      return;
+    }
+    if (selIds.length > 1) {
+      inspector.innerHTML = `<div class="muted">${selIds.length} elementi selezionati</div>`;
+      const del = document.createElement('button');
+      del.className = 'btn btnDanger';
+      del.textContent = 'Elimina selezionati';
+      del.type = 'button';
+      del.addEventListener('click', () => { removeSelected(); });
+      inspector.appendChild(del);
+      return;
+    }
+
+    const sel = objById(selIds[0]);
     if (!sel) {
       inspector.innerHTML = `<div class="muted">Nessuna selezione</div>`;
       return;
@@ -930,6 +1072,7 @@
     if (!state.rotation && state.rotation !== 0) state.rotation = 0;
     if (!LAYOUTS[state.layout]) state.layout = 'full-h';
     if (!state.layers) state.layers = { players:true, drawings:true, text:true };
+    state.selection = normalizeSelection(state.selection);
     if (!state.layoutStates) {
       state.layoutStates = {};
       state.layoutStates[state.layout] = {
@@ -940,10 +1083,13 @@
         drawings: state.drawings || [],
         texts: state.texts || [],
         props: state.props || [],
-        selection: state.selection || null,
+        selection: normalizeSelection(state.selection),
       };
     }
     for (const id of Object.keys(LAYOUTS)) ensureLayoutState(id);
+    for (const id of Object.keys(state.layoutStates)) {
+      state.layoutStates[id].selection = normalizeSelection(state.layoutStates[id].selection);
+    }
     bindLayoutState(state.layout);
     migrateLegacyBall();
     pushHistory(state);
@@ -963,7 +1109,7 @@
     const idx = state.props.findIndex(p => p.kind === 'ball');
     if (idx >= 0) {
       state.props.splice(idx, 1);
-      state.selection = null;
+      state.selection = [];
       commit();
       return;
     }
@@ -979,14 +1125,13 @@
   }
 
   function removeSelected() {
-    const id = state.selection;
-    if (!id) return;
-    if (id === 'ball') { state.ball.visible = false; state.selection = null; commit(); return; }
-    state.objects = state.objects.filter(o => o.id !== id);
-    state.drawings = state.drawings.filter(d => d.id !== id);
-    state.texts = state.texts.filter(t => t.id !== id);
-    state.props = state.props.filter(p => p.id !== id);
-    state.selection = null;
+    const ids = getSelection();
+    if (!ids.length) return;
+    state.objects = state.objects.filter(o => !ids.includes(o.id));
+    state.drawings = state.drawings.filter(d => !ids.includes(d.id));
+    state.texts = state.texts.filter(t => !ids.includes(t.id));
+    state.props = state.props.filter(p => !ids.includes(p.id));
+    state.selection = [];
     commit();
   }
 
@@ -999,7 +1144,7 @@
   }
 
   function addPlayerFromTool(role, x, y) {
-    const sel = state.selection ? objById(state.selection) : null;
+    const sel = primarySelection() ? objById(primarySelection()) : null;
     const team = (sel && sel.team) ? sel.team : 'A';
     addPlayer(team, x, y, '', role || 'X');
   }
@@ -1074,7 +1219,7 @@
     state.drawings = [];
     state.texts = [];
     state.props = [];
-    state.selection = null;
+    state.selection = [];
     commit();
   }
 
@@ -1164,7 +1309,7 @@
   // Toolbar buttons
   $('#btnAddPlayer').addEventListener('click', () => {
     // Add to the side closer to current selection/team if possible
-    const sel = state.selection ? objById(state.selection) : null;
+    const sel = primarySelection() ? objById(primarySelection()) : null;
     const team = (sel && sel.team) ? sel.team : 'A';
     const bounds = currentCourtBounds();
     const baseX = team === 'A' ? 4 : 14;
@@ -1265,9 +1410,9 @@
   }
 
   async function exportPng() {
-    const prevSelection = state.selection;
-    if (prevSelection) {
-      state.selection = null;
+    const prevSelection = getSelection();
+    if (prevSelection.length) {
+      state.selection = [];
       render();
     }
     const vb = exportViewBox();
@@ -1289,7 +1434,7 @@
     };
     img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
-    if (prevSelection) {
+    if (prevSelection.length) {
       state.selection = prevSelection;
       render();
     }
@@ -1329,7 +1474,7 @@
     ls.texts = Array.isArray(next.texts) ? next.texts : [];
     ls.props = Array.isArray(next.props) ? next.props : [];
     if (next.ball) ls.ball = next.ball;
-    ls.selection = null;
+    ls.selection = [];
     bindLayoutState(state.layout);
     if (typeof next.rotation === 'number') {
       state.rotation = ((next.rotation % 360) + 360) % 360;
@@ -1469,7 +1614,8 @@
 
   function openMenuForSelection(clientX, clientY) {
     if (!ctxMenu) return;
-    const sel = state.selection ? objById(state.selection) : null;
+    const selIds = getSelection();
+    const sel = selIds.length === 1 ? objById(selIds[0]) : null;
     ctxMenu.innerHTML = '';
     ctxMenu.hidden = false;
 
@@ -1507,6 +1653,12 @@
       b.addEventListener('click', () => { fn(); closeContextMenu(); });
       actions.appendChild(b);
     };
+
+    if (!sel && selIds.length > 1) {
+      addBtn('Elimina selezionati', () => removeSelected(), 'btn btnDanger');
+      ctxMenu.appendChild(actions);
+      return;
+    }
 
     if (!sel) {
       addBtn('Aggiungi giocatore A', () => addPlayer('A', 4, 4.5, ''), 'btn');
@@ -1622,6 +1774,7 @@
   let activePointerId = null;
   let drag = null; // {id, startX,startY, objStartX,objStartY}
   let arrowDraft = null; // {team, start, cur, pathEl}
+  let selectionBox = null;
   let longPressTimer = null;
   let spaceDown = false;
   let overlayDrag = null;
@@ -1715,6 +1868,24 @@
     gHandles.setPointerCapture(e.pointerId);
     activePointerId = e.pointerId;
     const pt = svgPointFromClient(e.clientX, e.clientY);
+    if (targetId === '__group__') {
+      const box = selectionBounds(getSelection());
+      if (!box) return;
+      const cx = box.x + box.w / 2;
+      const cy = box.y + box.h / 2;
+      const items = getTransformableSelection()
+        .map((o) => ({ id: o.id, x: o.x, y: o.y, rotation: o.rotation, scale: o.scale }));
+      if (!items.length) return;
+      if (handle === 'rotate') {
+        const startAngle = Math.atan2(pt.y - cy, pt.x - cx) * 180 / Math.PI;
+        drag = { type:'rotate-group', center:{x:cx,y:cy}, startAngle, items };
+      } else if (handle === 'scale') {
+        const startDist = Math.max(0.01, Math.hypot(pt.x - cx, pt.y - cy));
+        drag = { type:'scale-group', center:{x:cx,y:cy}, startDist, items };
+      }
+      return;
+    }
+
     const el = svg.querySelector(`[data-id="${targetId}"]`);
     if (!el) return;
     const box = elementBBoxInSvg(el);
@@ -1726,7 +1897,7 @@
       const startAngle = Math.atan2(pt.y - cy, pt.x - cx) * 180 / Math.PI;
       drag = { type:'rotate', id: targetId, center:{x:cx,y:cy}, startAngle, startRot: obj.rotation || 0 };
     } else if (handle === 'scale') {
-      const startDist = Math.hypot(pt.x - cx, pt.y - cy);
+      const startDist = Math.max(0.01, Math.hypot(pt.x - cx, pt.y - cy));
       drag = { type:'scale', id: targetId, center:{x:cx,y:cy}, startDist, startScale: obj.scale || 1 };
     }
   });
@@ -1750,7 +1921,7 @@
 
     if (mode === MODE.ARROW) {
       cancelLongPress();
-      const sel = state.selection ? objById(state.selection) : null;
+      const sel = primarySelection() ? objById(primarySelection()) : null;
       const team = (sel && sel.team) ? sel.team : 'A';
       arrowDraft = { team, start: pt, cur: pt };
       // temp path
@@ -1780,6 +1951,21 @@
     // select/drag objects
     if (targetId) {
       cancelLongPress();
+      if (e.shiftKey) {
+        toggleSelection(targetId);
+        return;
+      }
+      const selIds = getSelection();
+      const isSel = isSelected(targetId);
+      if (isSel && selIds.length > 1) {
+        const items = selIds
+          .map((id) => objById(id))
+          .filter((o) => o && (o.type === 'player' || o.type === 'text' || o.type === 'prop'));
+        if (items.some((o) => o.id === targetId)) {
+          drag = { type:'move-multi', start: pt, items: items.map((o) => ({ id: o.id, x: o.x, y: o.y })) };
+          return;
+        }
+      }
       setSelection(targetId);
       const obj = objById(targetId);
       if (!obj) return;
@@ -1790,8 +1976,23 @@
       return;
     }
 
+    if (mode === MODE.SELECT) {
+      cancelLongPress();
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('fill', 'rgba(94,234,212,0.12)');
+      rect.setAttribute('stroke', 'rgba(94,234,212,0.7)');
+      rect.setAttribute('stroke-width', '0.05');
+      rect.setAttribute('stroke-dasharray', '0.18 0.12');
+      rect.style.pointerEvents = 'none';
+      gHandles.appendChild(rect);
+      selectionBox = { start: pt, rectEl: rect, additive: e.shiftKey };
+      drag = { type:'selectbox', start: pt, additive: e.shiftKey };
+      updateSelectionRect(rect, pt, pt);
+      return;
+    }
+
     // click on empty court => clear selection
-    setSelection(null);
+    clearSelection();
   });
 
   svg.addEventListener('pointermove', (e) => {
@@ -1801,6 +2002,47 @@
 
     // cancel long press if moved a bit
     if (longPressTimer && drag) cancelLongPress();
+
+    if (drag?.type === 'rotate-group') {
+      cancelLongPress();
+      const cx = drag.center.x;
+      const cy = drag.center.y;
+      const ang = Math.atan2(pt.y - cy, pt.x - cx) * 180 / Math.PI;
+      const delta = ang - drag.startAngle;
+      const rad = delta * Math.PI / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      for (const it of drag.items) {
+        const obj = objById(it.id);
+        if (!obj) continue;
+        const dx = it.x - cx;
+        const dy = it.y - cy;
+        obj.x = cx + dx * cos - dy * sin;
+        obj.y = cy + dx * sin + dy * cos;
+        obj.rotation = (it.rotation || 0) + delta;
+      }
+      render();
+      return;
+    }
+
+    if (drag?.type === 'scale-group') {
+      cancelLongPress();
+      const cx = drag.center.x;
+      const cy = drag.center.y;
+      const dist = Math.max(0.01, Math.hypot(pt.x - cx, pt.y - cy));
+      const ratio = clamp(dist / Math.max(0.01, drag.startDist), 0.2, 4);
+      for (const it of drag.items) {
+        const obj = objById(it.id);
+        if (!obj) continue;
+        const dx = it.x - cx;
+        const dy = it.y - cy;
+        obj.x = cx + dx * ratio;
+        obj.y = cy + dy * ratio;
+        obj.scale = clamp((it.scale || 1) * ratio, 0.2, 4);
+      }
+      render();
+      return;
+    }
 
     if (drag?.type === 'rotate' || drag?.type === 'scale') {
       cancelLongPress();
@@ -1829,12 +2071,33 @@
       return;
     }
 
+    if (drag?.type === 'selectbox' && selectionBox) {
+      cancelLongPress();
+      updateSelectionRect(selectionBox.rectEl, selectionBox.start, pt);
+      return;
+    }
+
     if (arrowDraft) {
       arrowDraft.cur = pt;
       const mx = (arrowDraft.start.x + pt.x) / 2;
       const my = (arrowDraft.start.y + pt.y) / 2;
       const d = `M ${arrowDraft.start.x} ${arrowDraft.start.y} Q ${mx} ${my} ${pt.x} ${pt.y}`;
       arrowDraft.pathEl.setAttribute('d', d);
+      return;
+    }
+
+    if (drag?.type === 'move-multi') {
+      cancelLongPress();
+      const dx = pt.x - drag.start.x;
+      const dy = pt.y - drag.start.y;
+      const bounds = currentCourtBounds();
+      for (const it of drag.items) {
+        const obj = objById(it.id);
+        if (!obj) continue;
+        obj.x = clamp(it.x + dx, bounds.minX ?? 0, bounds.maxX);
+        obj.y = clamp(it.y + dy, bounds.minY ?? 0, bounds.maxY);
+      }
+      render();
       return;
     }
 
@@ -1861,6 +2124,23 @@
     svg.releasePointerCapture(e.pointerId);
     activePointerId = null;
 
+    if (drag?.type === 'selectbox' && selectionBox) {
+      const pt = svgPointFromClient(e.clientX, e.clientY);
+      const rect = updateSelectionRect(selectionBox.rectEl, selectionBox.start, pt);
+      selectionBox.rectEl.remove();
+      selectionBox = null;
+      const minSize = 0.2;
+      if (rect.w < minSize && rect.h < minSize) {
+        if (!drag.additive) clearSelection();
+      } else {
+        const ids = idsInRect(rect);
+        if (drag.additive) setSelection([...getSelection(), ...ids]);
+        else setSelection(ids);
+      }
+      drag = null;
+      return;
+    }
+
     if (arrowDraft) {
       const pt = arrowDraft.cur;
       const s = arrowDraft.start;
@@ -1871,7 +2151,7 @@
         const my = (s.y + pt.y) / 2;
         const d = `M ${s.x} ${s.y} Q ${mx} ${my} ${pt.x} ${pt.y}`;
         state.drawings.push({ id: ID(), type:'arrow', team: arrowDraft.team, path: d, style:{ width:'0.12', opacity:'0.9' } });
-        state.selection = state.drawings[state.drawings.length - 1].id;
+        setSelection(state.drawings[state.drawings.length - 1].id);
         commit();
       } else {
         render();
@@ -1881,9 +2161,9 @@
     }
 
     if (drag) {
-      if (drag.type === 'move') commit();
+      if (drag.type === 'move' || drag.type === 'move-multi') commit();
       if (drag.type === 'pan') commit();
-      if (drag.type === 'rotate' || drag.type === 'scale') commit();
+      if (drag.type === 'rotate' || drag.type === 'scale' || drag.type === 'rotate-group' || drag.type === 'scale-group') commit();
       drag = null;
     }
   });
@@ -1910,6 +2190,8 @@
   svg.addEventListener('pointercancel', () => {
     cancelLongPress();
     arrowDraft = null;
+    if (selectionBox?.rectEl) selectionBox.rectEl.remove();
+    selectionBox = null;
     drag = null;
     activePointerId = null;
     render();
@@ -1917,6 +2199,7 @@
 
   // Click selection for drawings
   svg.addEventListener('click', (e) => {
+    if (e.shiftKey) return;
     const id = hitTestTarget(e.target);
     if (!id) return;
     const obj = objById(id);
@@ -1960,7 +2243,10 @@
   svg.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const targetId = hitTestTarget(e.target);
-    if (targetId) setSelection(targetId);
+    if (targetId) {
+      if (e.shiftKey) toggleSelection(targetId);
+      else setSelection(targetId);
+    }
     openMenuForSelection(e.clientX, e.clientY);
   });
 
@@ -1975,23 +2261,39 @@
 
   // Select drawings by clicking them (they are paths)
   gDrawings.addEventListener('pointerdown', (e) => {
+    if (e.shiftKey) return;
     const id = hitTestTarget(e.target);
-    if (id) setSelection(id);
+    if (id) {
+      if (getSelection().length > 1 && isSelected(id)) return;
+      setSelection(id);
+    }
   }, true);
 
   gPlayers.addEventListener('pointerdown', (e) => {
+    if (e.shiftKey) return;
     const id = hitTestTarget(e.target);
-    if (id) setSelection(id);
+    if (id) {
+      if (getSelection().length > 1 && isSelected(id)) return;
+      setSelection(id);
+    }
   }, true);
 
   gProps.addEventListener('pointerdown', (e) => {
+    if (e.shiftKey) return;
     const id = hitTestTarget(e.target);
-    if (id) setSelection(id);
+    if (id) {
+      if (getSelection().length > 1 && isSelected(id)) return;
+      setSelection(id);
+    }
   }, true);
 
   gText.addEventListener('pointerdown', (e) => {
+    if (e.shiftKey) return;
     const id = hitTestTarget(e.target);
-    if (id) setSelection(id);
+    if (id) {
+      if (getSelection().length > 1 && isSelected(id)) return;
+      setSelection(id);
+    }
   }, true);
 
   // Save/load to localStorage for web usage
