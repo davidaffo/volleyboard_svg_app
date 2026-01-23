@@ -127,13 +127,7 @@ class VolleyBoardPlugin extends Plugin {
       const refreshSourceText = (state) => {
         try { sourceText = JSON.stringify(state, null, 2); } catch {}
       };
-      if (blockId && !/"blockId"\s*:/.test(sourceText)) {
-        try {
-          await this.persistState(ctx, sourceText, parsed, { blockLineStart, forceLineStart: true });
-          refreshSourceText(parsed);
-        } catch {}
-      }
-      const persistSafe = async (nextState, strict = true) => {
+      const persistSafe = async (nextState, strict = false) => {
         try {
           await this.persistState(ctx, sourceText, nextState, { blockLineStart, blockId, strict });
           refreshSourceText(nextState);
@@ -187,18 +181,17 @@ class VolleyBoardPlugin extends Plugin {
 
         api.setState(parsed);
 
+        let dirty = false;
+        let btnSaveClose = null;
+        const setDirty = (value) => {
+          dirty = value;
+          if (btnSaveClose) btnSaveClose.textContent = dirty ? 'Salva e chiudi*' : 'Salva e chiudi';
+        };
+
         let saveTimer = null;
         const scheduleSave = (nextState) => {
           parsed = nextState;
-          if (saveTimer) clearTimeout(saveTimer);
-          saveTimer = setTimeout(async () => {
-            try {
-              await persistSafe(nextState, true);
-            } catch (e) {
-              console.error(e);
-              new Notice('VolleyBoard: impossibile salvare (vedi console)');
-            }
-          }, 250);
+          setDirty(true);
         };
 
         api.subscribe(scheduleSave);
@@ -210,7 +203,7 @@ class VolleyBoardPlugin extends Plugin {
         controls.style.background = 'rgba(0,0,0,0.35)';
         controls.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
 
-        const btnSaveClose = document.createElement('button');
+        btnSaveClose = document.createElement('button');
         btnSaveClose.textContent = 'Salva e chiudi';
         btnSaveClose.addEventListener('click', async () => {
           try {
@@ -218,7 +211,7 @@ class VolleyBoardPlugin extends Plugin {
             parsed = latest;
           } catch {}
           try {
-            await persistSafe(parsed, true);
+            await persistSafe(parsed, false);
           } catch (e) {
             console.error(e);
             new Notice('VolleyBoard: impossibile salvare (vedi console)');
