@@ -25,7 +25,7 @@
     rotation: 0,
     view: { x: -1, y: -1, w: 20, h: 11 }, // viewBox
     notes: '',
-    draw: { color: '#ffffff', width: 0.08 },
+    draw: { color: '#ffffff', width: 0.08, dash: 'solid' },
     layers: { players: true, drawings: true, text: true },
     objects: [], // {id,type,team,x,y,role,label,style,...}
     drawings: [], // {id,type,path,team,style}
@@ -175,9 +175,6 @@
     <clipPath id="clipHalf" clipPathUnits="userSpaceOnUse">
       <rect x="0" y="0" width="9" height="9" rx="0.4"></rect>
     </clipPath>
-    <marker id="arrowHead" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
-    </marker>
   `;
   svg.appendChild(defs);
 
@@ -663,35 +660,212 @@
     }
   }
 
+  function parsePathNums(path) {
+    const nums = (path || '').match(/-?\d*\.?\d+/g);
+    return nums ? nums.map(Number) : [];
+  }
+
+  function inferArrowKindFromPath(path) {
+    if (!path) return 'straight';
+    if (/Q/i.test(path)) return 'curve';
+    const lCount = (path.match(/L/g) || []).length;
+    if (lCount >= 2) return 'angle';
+    return 'straight';
+  }
+
+  function ensureArrowPoints(d) {
+    if (d.points && d.points.start && d.points.end) return d.points;
+    const nums = parsePathNums(d.path);
+    let points = null;
+    if (/Q/i.test(d.path || '') && nums.length >= 6) {
+      points = {
+        start: { x: nums[0], y: nums[1] },
+        mid: { x: nums[2], y: nums[3] },
+        end: { x: nums[4], y: nums[5] },
+      };
+    } else if ((d.path || '').match(/L/g) && nums.length >= 6) {
+      points = {
+        start: { x: nums[0], y: nums[1] },
+        mid: { x: nums[2], y: nums[3] },
+        end: { x: nums[4], y: nums[5] },
+      };
+    } else if (nums.length >= 4) {
+      points = {
+        start: { x: nums[0], y: nums[1] },
+        mid: { x: (nums[0] + nums[2]) / 2, y: (nums[1] + nums[3]) / 2 },
+        end: { x: nums[2], y: nums[3] },
+      };
+    }
+    if (!points) {
+      points = {
+        start: { x: 2, y: 2 },
+        mid: { x: 3, y: 2 },
+        end: { x: 4, y: 2 },
+      };
+    }
+    d.points = points;
+    return points;
+  }
+
+  function arrowPathFromPoints(points, kind) {
+    const s = points.start;
+    const m = points.mid;
+    const e = points.end;
+    if (kind === 'angle') {
+      const v1x = m.x - s.x;
+      const v1y = m.y - s.y;
+      const v2x = e.x - m.x;
+      const v2y = e.y - m.y;
+      const len1 = Math.hypot(v1x, v1y);
+      const len2 = Math.hypot(v2x, v2y);
+      if (len1 < 0.001 || len2 < 0.001) return `M ${s.x} ${s.y} L ${e.x} ${e.y}`;
+      const r = Math.min(0.35, len1 * 0.45, len2 * 0.45);
+      const n1x = v1x / len1;
+      const n1y = v1y / len1;
+      const n2x = v2x / len2;
+      const n2y = v2y / len2;
+      const p1x = m.x - n1x * r;
+      const p1y = m.y - n1y * r;
+      const p2x = m.x + n2x * r;
+      const p2y = m.y + n2y * r;
+      return `M ${s.x} ${s.y} L ${p1x} ${p1y} Q ${m.x} ${m.y} ${p2x} ${p2y} L ${e.x} ${e.y}`;
+    }
+    if (kind === 'curve') return `M ${s.x} ${s.y} Q ${m.x} ${m.y} ${e.x} ${e.y}`;
+    return `M ${s.x} ${s.y} L ${e.x} ${e.y}`;
+  }
+
+  function arrowDirection(points, kind) {
+    const s = points.start;
+    const m = points.mid;
+    const e = points.end;
+    if (kind === 'angle' || kind === 'curve') return { x: e.x - m.x, y: e.y - m.y };
+    return { x: e.x - s.x, y: e.y - s.y };
+  }
+
+  function applyStrokeStyle(el, style) {
+    const dash = style?.dash || 'solid';
+    if (dash === 'dash') el.setAttribute('stroke-dasharray', '0.26 0.18');
+    else if (dash === 'dot') el.setAttribute('stroke-dasharray', '0.06 0.14');
+    else el.removeAttribute('stroke-dasharray');
+  }
+
+  function drawArrowHead(headEl, end, dir, size, color) {
+    const len = Math.max(0.2, size);
+    const w = len * 0.7;
+    const mag = Math.hypot(dir.x, dir.y) || 1;
+    const ux = dir.x / mag;
+    const uy = dir.y / mag;
+    const bx = end.x - ux * len;
+    const by = end.y - uy * len;
+    const px = -uy;
+    const py = ux;
+    const p1x = bx + px * w * 0.5;
+    const p1y = by + py * w * 0.5;
+    const p2x = bx - px * w * 0.5;
+    const p2y = by - py * w * 0.5;
+    headEl.setAttribute('d', `M ${end.x} ${end.y} L ${p1x} ${p1y} L ${p2x} ${p2y} Z`);
+    headEl.setAttribute('fill', color);
+  }
+
+  function arrowHeadSize(width) {
+    const w = Number(width) || 0.08;
+    return Math.max(0.34, w * 4.8);
+  }
+
+  function shortenArrowEnd(points, kind, size) {
+    const len = Math.max(0.18, size * 0.85);
+    const s = points.start;
+    const m = points.mid;
+    const e = points.end;
+    if (kind === 'angle' || kind === 'curve') {
+      const vx = e.x - m.x;
+      const vy = e.y - m.y;
+      const mag = Math.hypot(vx, vy) || 1;
+      const ux = vx / mag;
+      const uy = vy / mag;
+      const end = { x: e.x - ux * len, y: e.y - uy * len };
+      return { start: { ...s }, mid: { ...m }, end };
+    }
+    const vx = e.x - s.x;
+    const vy = e.y - s.y;
+    const mag = Math.hypot(vx, vy) || 1;
+    const ux = vx / mag;
+    const uy = vy / mag;
+    const end = { x: e.x - ux * len, y: e.y - uy * len };
+    return { start: { ...s }, mid: { ...m }, end };
+  }
+
   function renderDrawings() {
     gDrawings.innerHTML = '';
     for (const d of state.drawings) {
-      const p = document.createElementNS(svgNS, 'path');
-      p.setAttribute('data-id', d.id);
-      p.setAttribute('d', d.path);
-      p.setAttribute('fill', 'none');
-      p.setAttribute('stroke', 'currentColor');
-      p.setAttribute('stroke-width', d.style?.width ?? '0.08');
-      p.setAttribute('stroke-linecap', 'round');
-      p.setAttribute('stroke-linejoin', 'round');
-      if (d.type === 'arrow') p.setAttribute('marker-end', 'url(#arrowHead)');
-      p.style.color = d.style?.color ?? teamColor(d.team);
-      p.style.cursor = 'pointer';
-      p.setAttribute('opacity', d.style?.opacity ?? '0.9');
+      if (d.type === 'arrow') {
+        const g = document.createElementNS(svgNS, 'g');
+        g.setAttribute('data-id', d.id);
+        g.style.cursor = 'pointer';
+        const points = ensureArrowPoints(d);
+        const kind = d.kind || inferArrowKindFromPath(d.path);
+        d.kind = kind;
+        const width = Number(d.style?.width ?? 0.08);
+        const headSize = arrowHeadSize(width);
+        const shortened = shortenArrowEnd(points, kind, headSize);
+        const path = arrowPathFromPoints(shortened, kind);
+        d.path = arrowPathFromPoints(points, kind);
 
-      if (isSelected(d.id)) {
-        p.setAttribute('stroke-width', '0.12');
-        p.setAttribute('opacity', '1');
-      }
+        const p = document.createElementNS(svgNS, 'path');
+        p.setAttribute('d', path);
+        p.setAttribute('fill', 'none');
+        p.setAttribute('stroke', 'currentColor');
+        p.setAttribute('stroke-width', d.style?.width ?? '0.08');
+        p.setAttribute('stroke-linecap', 'round');
+        p.setAttribute('stroke-linejoin', 'round');
+        applyStrokeStyle(p, d.style);
+        p.style.color = teamColor(d.team);
+        p.setAttribute('opacity', d.style?.opacity ?? '0.9');
+        p.setAttribute('data-id', d.id);
 
-      gDrawings.appendChild(p);
-      const rot = d.rotation || 0;
-      const scale = d.scale || 1;
-      if (rot !== 0 || scale !== 1) {
-        const box = p.getBBox();
-        const cx = box.x + box.width / 2;
-        const cy = box.y + box.height / 2;
-        p.setAttribute('transform', `translate(${cx} ${cy}) rotate(${rot}) scale(${scale}) translate(${-cx} ${-cy})`);
+        const head = document.createElementNS(svgNS, 'path');
+        head.setAttribute('data-id', d.id);
+        const dir = arrowDirection(points, kind);
+        drawArrowHead(head, points.end, dir, headSize, teamColor(d.team));
+        head.setAttribute('opacity', d.style?.opacity ?? '0.9');
+
+        if (isSelected(d.id)) {
+          p.setAttribute('stroke-width', '0.12');
+          p.setAttribute('opacity', '1');
+          head.setAttribute('opacity', '1');
+        }
+
+        g.appendChild(p);
+        g.appendChild(head);
+        gDrawings.appendChild(g);
+      } else {
+        const p = document.createElementNS(svgNS, 'path');
+        p.setAttribute('data-id', d.id);
+        p.setAttribute('d', d.path);
+        p.setAttribute('fill', 'none');
+        p.setAttribute('stroke', 'currentColor');
+        p.setAttribute('stroke-width', d.style?.width ?? '0.08');
+        p.setAttribute('stroke-linecap', 'round');
+        p.setAttribute('stroke-linejoin', 'round');
+        applyStrokeStyle(p, d.style);
+        p.style.color = d.style?.color ?? teamColor(d.team);
+        p.style.cursor = 'pointer';
+        p.setAttribute('opacity', d.style?.opacity ?? '0.9');
+
+        if (isSelected(d.id)) {
+          p.setAttribute('stroke-width', '0.12');
+          p.setAttribute('opacity', '1');
+        }
+
+        gDrawings.appendChild(p);
+        const rot = d.rotation || 0;
+        const scale = d.scale || 1;
+        if (rot !== 0 || scale !== 1) {
+          const box = p.getBBox();
+          const cx = box.x + box.width / 2;
+          const cy = box.y + box.height / 2;
+          p.setAttribute('transform', `translate(${cx} ${cy}) rotate(${rot}) scale(${scale}) translate(${-cx} ${-cy})`);
+        }
       }
     }
   }
@@ -712,7 +886,7 @@
       el.setAttribute('y', '0');
       el.setAttribute('font-size', t.style?.size ?? '0.55');
       el.setAttribute('fill', 'currentColor');
-      el.style.color = teamColor(t.team);
+      el.style.color = t.style?.color ?? teamColor(t.team);
       if (angle || rot) el.setAttribute('transform', `rotate(${-(angle) + rot})`);
       el.textContent = t.text;
 
@@ -803,6 +977,27 @@
       const id = selIds[0];
       const el = svg.querySelector(`[data-id="${id}"]`);
       if (!el) return;
+      const obj = objById(id);
+      if (obj && obj.type === 'arrow') {
+        const points = ensureArrowPoints(obj);
+        const handle = (x, y, type) => {
+          const c = document.createElementNS(svgNS, 'circle');
+          c.setAttribute('cx', String(x));
+          c.setAttribute('cy', String(y));
+          c.setAttribute('r', type === 'arrow-mid' ? '0.1' : '0.12');
+          c.setAttribute('fill', 'rgba(17,20,26,0.9)');
+          c.setAttribute('stroke', 'rgba(255,255,255,0.8)');
+          c.setAttribute('stroke-width', '0.04');
+          c.setAttribute('data-handle', type);
+          c.setAttribute('data-target', id);
+          c.style.cursor = 'move';
+          gHandles.appendChild(c);
+        };
+        handle(points.start.x, points.start.y, 'arrow-start');
+        handle(points.mid.x, points.mid.y, 'arrow-mid');
+        handle(points.end.x, points.end.y, 'arrow-end');
+        return;
+      }
       const box = elementBBoxInSvg(el);
       const cx = box.x + box.w / 2;
       const cy = box.y + box.h / 2;
@@ -1126,7 +1321,8 @@
     if (!LAYOUTS[state.layout]) state.layout = 'full-h';
     if (!state.layers) state.layers = { players:true, drawings:true, text:true };
     if (!state.mode) state.mode = MODE.SELECT;
-    if (!state.draw) state.draw = { color:'#ffffff', width:0.08 };
+    if (!state.draw) state.draw = { color:'#ffffff', width:0.08, dash:'solid' };
+    if (!state.draw.dash) state.draw.dash = 'solid';
     state.selection = normalizeSelection(state.selection);
     if (!state.layoutStates) {
       state.layoutStates = {};
@@ -1597,6 +1793,7 @@
       ls.rotation = state.rotation;
     }
     if (next.draw) state.draw = next.draw;
+    if (state.draw && !state.draw.dash) state.draw.dash = 'solid';
     if (next.layers) state.layers = next.layers;
     commit();
   }
@@ -1662,8 +1859,35 @@
 
   if (drawColorInput) {
     drawColorInput.addEventListener('input', () => {
-      state.draw = state.draw || { color: '#ffffff', width: 0.08 };
-      state.draw.color = drawColorInput.value || '#ffffff';
+      const value = drawColorInput.value || '#ffffff';
+      const selIds = getSelection();
+      if (selIds.length === 1) {
+        const obj = objById(selIds[0]);
+        if (obj) {
+          if (obj.type === 'arrow') {
+            return;
+          }
+          if (obj.type === 'freehand' || obj.type === 'rect' || obj.type === 'circle') {
+            obj.style = obj.style || {};
+            obj.style.color = value;
+            commit();
+            return;
+          }
+          if (obj.type === 'prop') {
+            obj.color = value;
+            commit();
+            return;
+          }
+          if (obj.type === 'text') {
+            obj.style = obj.style || {};
+            obj.style.color = value;
+            commit();
+            return;
+          }
+        }
+      }
+      state.draw = state.draw || { color: '#ffffff', width: 0.08, dash: 'solid' };
+      state.draw.color = value;
     });
   }
 
@@ -1841,6 +2065,51 @@
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
       row('Squadra', teamSel);
 
+      const typeSel = document.createElement('select');
+      [
+        { id: 'straight', name: 'Dritta' },
+        { id: 'curve', name: 'Curva' },
+        { id: 'angle', name: 'Angolo' },
+      ].forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        typeSel.appendChild(opt);
+      });
+      sel.kind = sel.kind || inferArrowKindFromPath(sel.path);
+      typeSel.value = sel.kind;
+      typeSel.addEventListener('change', () => {
+        sel.kind = typeSel.value;
+        const pts = ensureArrowPoints(sel);
+        if (sel.kind === 'straight') {
+          pts.mid = { x: (pts.start.x + pts.end.x) / 2, y: (pts.start.y + pts.end.y) / 2 };
+        }
+        sel.points = pts;
+        sel.path = arrowPathFromPoints(pts, sel.kind);
+        commit();
+      });
+      row('Tipo freccia', typeSel);
+
+      const dashSel = document.createElement('select');
+      [
+        { id: 'solid', name: 'Pieno' },
+        { id: 'dash', name: 'Tratteggio' },
+        { id: 'dot', name: 'Puntini' },
+      ].forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        dashSel.appendChild(opt);
+      });
+      sel.style = sel.style || {};
+      dashSel.value = sel.style.dash || 'solid';
+      dashSel.addEventListener('change', () => {
+        sel.style = sel.style || {};
+        sel.style.dash = dashSel.value;
+        commit();
+      });
+      row('Tratto', dashSel);
+
       const opacity = document.createElement('input');
       opacity.type = 'number';
       opacity.min = '0.1';
@@ -1995,6 +2264,23 @@
     gHandles.setPointerCapture(e.pointerId);
     activePointerId = e.pointerId;
     const pt = svgPointFromClient(e.clientX, e.clientY);
+    if (handle.startsWith('arrow-')) {
+      const obj = objById(targetId);
+      if (!obj || obj.type !== 'arrow') return;
+      const points = ensureArrowPoints(obj);
+      drag = {
+        type: 'arrow-point',
+        id: targetId,
+        point: handle.replace('arrow-', ''),
+        start: pt,
+        base: {
+          start: { ...points.start },
+          mid: { ...points.mid },
+          end: { ...points.end },
+        },
+      };
+      return;
+    }
     if (targetId === '__group__') {
       const box = selectionBounds(getSelection());
       if (!box) return;
@@ -2051,10 +2337,19 @@
       cancelLongPress();
       const sel = primarySelection() ? objById(primarySelection()) : null;
       const team = (sel && sel.team) ? sel.team : 'A';
-      const color = state.draw?.color || '#ffffff';
+      const color = teamColor(team);
       const width = state.draw?.width ?? 0.08;
-      arrowDraft = { team, start: pt, cur: pt, color, width };
-      // temp path
+      arrowDraft = {
+        team,
+        start: pt,
+        cur: pt,
+        mid: { x: pt.x, y: pt.y },
+        color,
+        width,
+        kind: 'straight',
+        dash: state.draw?.dash || 'solid',
+      };
+      const g = document.createElementNS(svgNS, 'g');
       const pathEl = document.createElementNS(svgNS, 'path');
       pathEl.setAttribute('d', `M ${pt.x} ${pt.y} L ${pt.x} ${pt.y}`);
       pathEl.setAttribute('fill', 'none');
@@ -2062,12 +2357,22 @@
       pathEl.setAttribute('stroke-width', String(width));
       pathEl.setAttribute('stroke-linecap', 'round');
       pathEl.setAttribute('stroke-linejoin', 'round');
-      pathEl.setAttribute('marker-end', 'url(#arrowHead)');
       pathEl.setAttribute('opacity', '0.9');
       pathEl.style.color = color || teamColor(team);
       pathEl.style.pointerEvents = 'none';
-      gDrawings.appendChild(pathEl);
+      applyStrokeStyle(pathEl, { dash: arrowDraft.dash });
+
+      const headEl = document.createElementNS(svgNS, 'path');
+      headEl.setAttribute('opacity', '0.9');
+      headEl.style.pointerEvents = 'none';
+      drawArrowHead(headEl, pt, { x: 1, y: 0 }, arrowHeadSize(width), color || teamColor(team));
+
+      g.appendChild(pathEl);
+      g.appendChild(headEl);
+      gDrawings.appendChild(g);
+      arrowDraft.g = g;
       arrowDraft.pathEl = pathEl;
+      arrowDraft.headEl = headEl;
       return;
     }
 
@@ -2141,6 +2446,18 @@
       // start drag
       if (obj.type === 'player' || obj.type === 'text' || obj.type === 'prop') {
         drag = { type:'move', id: targetId, start: pt, startObj: { x: obj.x, y: obj.y } };
+      } else if (obj.type === 'arrow') {
+        const points = ensureArrowPoints(obj);
+        drag = {
+          type:'move-arrow',
+          id: targetId,
+          start: pt,
+          base: {
+            start: { ...points.start },
+            mid: { ...points.mid },
+            end: { ...points.end },
+          },
+        };
       }
       return;
     }
@@ -2171,6 +2488,39 @@
 
     // cancel long press if moved a bit
     if (longPressTimer && drag) cancelLongPress();
+
+    if (drag?.type === 'arrow-point') {
+      const obj = objById(drag.id);
+      if (!obj) return;
+      const points = ensureArrowPoints(obj);
+      if (drag.point === 'start') {
+        points.start = { ...pt };
+      } else if (drag.point === 'end') {
+        points.end = { ...pt };
+      } else {
+        points.mid = { ...pt };
+        if (!obj.kind || obj.kind === 'straight') obj.kind = 'angle';
+      }
+      obj.points = points;
+      obj.path = arrowPathFromPoints(points, obj.kind || 'straight');
+      render();
+      return;
+    }
+
+    if (drag?.type === 'move-arrow') {
+      const obj = objById(drag.id);
+      if (!obj) return;
+      const dx = pt.x - drag.start.x;
+      const dy = pt.y - drag.start.y;
+      const points = ensureArrowPoints(obj);
+      points.start = { x: drag.base.start.x + dx, y: drag.base.start.y + dy };
+      points.mid = { x: drag.base.mid.x + dx, y: drag.base.mid.y + dy };
+      points.end = { x: drag.base.end.x + dx, y: drag.base.end.y + dy };
+      obj.points = points;
+      obj.path = arrowPathFromPoints(points, obj.kind || 'straight');
+      render();
+      return;
+    }
 
     if (drag?.type === 'rotate-group') {
       cancelLongPress();
@@ -2268,10 +2618,12 @@
 
     if (arrowDraft) {
       arrowDraft.cur = pt;
-      const mx = (arrowDraft.start.x + pt.x) / 2;
-      const my = (arrowDraft.start.y + pt.y) / 2;
-      const d = `M ${arrowDraft.start.x} ${arrowDraft.start.y} Q ${mx} ${my} ${pt.x} ${pt.y}`;
+      arrowDraft.mid = { x: (arrowDraft.start.x + pt.x) / 2, y: (arrowDraft.start.y + pt.y) / 2 };
+      const points = { start: arrowDraft.start, mid: arrowDraft.mid, end: pt };
+      const d = arrowPathFromPoints(points, arrowDraft.kind || 'straight');
       arrowDraft.pathEl.setAttribute('d', d);
+      const dir = arrowDirection(points, arrowDraft.kind || 'straight');
+      drawArrowHead(arrowDraft.headEl, pt, dir, arrowHeadSize(arrowDraft.width ?? 0.08), arrowDraft.color || teamColor(arrowDraft.team));
       return;
     }
 
@@ -2370,12 +2722,24 @@
       const pt = arrowDraft.cur;
       const s = arrowDraft.start;
       const dist = Math.hypot(pt.x - s.x, pt.y - s.y);
-      gDrawings.removeChild(arrowDraft.pathEl);
+      if (arrowDraft.g) gDrawings.removeChild(arrowDraft.g);
       if (dist > 0.35) {
-        const mx = (s.x + pt.x) / 2;
-        const my = (s.y + pt.y) / 2;
-        const d = `M ${s.x} ${s.y} Q ${mx} ${my} ${pt.x} ${pt.y}`;
-        state.drawings.push({ id: ID(), type:'arrow', team: arrowDraft.team, path: d, style:{ width: String(arrowDraft.width ?? 0.08), opacity:'0.9', color: arrowDraft.color } });
+        const points = {
+          start: { x: s.x, y: s.y },
+          mid: { x: (s.x + pt.x) / 2, y: (s.y + pt.y) / 2 },
+          end: { x: pt.x, y: pt.y },
+        };
+        const kind = arrowDraft.kind || 'straight';
+        const d = arrowPathFromPoints(points, kind);
+        state.drawings.push({
+          id: ID(),
+          type:'arrow',
+          team: arrowDraft.team,
+          path: d,
+          points,
+          kind,
+          style:{ width: String(arrowDraft.width ?? 0.08), opacity:'0.9', dash: arrowDraft.dash || 'solid' },
+        });
         setSelection(state.drawings[state.drawings.length - 1].id);
         commit();
       } else {
@@ -2431,6 +2795,7 @@
 
     if (drag) {
       if (drag.type === 'move' || drag.type === 'move-multi') commit();
+      if (drag.type === 'arrow-point' || drag.type === 'move-arrow') commit();
       if (drag.type === 'pan') commit();
       if (drag.type === 'rotate' || drag.type === 'scale' || drag.type === 'rotate-group' || drag.type === 'scale-group') commit();
       drag = null;
