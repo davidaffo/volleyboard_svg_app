@@ -51,6 +51,24 @@ body{
   color:var(--muted);
   font-size:12px;
 }
+.colorControl{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:12px;
+  background: rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--muted);
+  font-size:12px;
+}
+.colorControl input[type="color"]{
+  width:28px;
+  height:24px;
+  border:none;
+  padding:0;
+  background:transparent;
+}
 .zoomControl input[type="range"]{
   width:120px;
 }

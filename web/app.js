@@ -25,6 +25,7 @@
     rotation: 0,
     view: { x: -1, y: -1, w: 20, h: 11 }, // viewBox
     notes: '',
+    draw: { color: '#ffffff', width: 0.08 },
     layers: { players: true, drawings: true, text: true },
     objects: [], // {id,type,team,x,y,role,label,style,...}
     drawings: [], // {id,type,path,team,style}
@@ -114,6 +115,9 @@
     SELECT: 'select',
     ARROW: 'arrow',
     TEXT: 'text',
+    FREEHAND: 'freehand',
+    RECT: 'rect',
+    CIRCLE: 'circle',
     PAN: 'pan',
   };
 
@@ -133,6 +137,7 @@
   const chipZoom = $('#chipZoom');
   const toolGrid = $('#toolGrid');
   const zoomSlider = $('#zoomSlider');
+  const drawColorInput = $('#drawColor');
   const ENABLE_LONG_PRESS_MENU = false;
 
   // Build SVG
@@ -669,8 +674,8 @@
       p.setAttribute('stroke-width', d.style?.width ?? '0.08');
       p.setAttribute('stroke-linecap', 'round');
       p.setAttribute('stroke-linejoin', 'round');
-      p.setAttribute('marker-end', 'url(#arrowHead)');
-      p.style.color = teamColor(d.team);
+      if (d.type === 'arrow') p.setAttribute('marker-end', 'url(#arrowHead)');
+      p.style.color = d.style?.color ?? teamColor(d.team);
       p.style.cursor = 'pointer';
       p.setAttribute('opacity', d.style?.opacity ?? '0.9');
 
@@ -943,6 +948,31 @@
       inspector.appendChild(del);
     }
 
+    if (type === 'arrow' || type === 'freehand' || type === 'rect' || type === 'circle') {
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = sel.style?.color || '#ffffff';
+      colorInput.addEventListener('input', () => {
+        sel.style = sel.style || {};
+        sel.style.color = colorInput.value;
+        commit();
+      });
+      row('Colore', colorInput);
+
+      const widthInput = document.createElement('input');
+      widthInput.type = 'number';
+      widthInput.min = '0.02';
+      widthInput.max = '0.3';
+      widthInput.step = '0.01';
+      widthInput.value = sel.style?.width ?? 0.08;
+      widthInput.addEventListener('input', () => {
+        sel.style = sel.style || {};
+        sel.style.width = String(clamp(Number(widthInput.value) || 0.08, 0.02, 0.3));
+        commit();
+      });
+      row('Spessore', widthInput);
+    }
+
     if (type === 'arrow') {
       const teamSel = document.createElement('select');
       for (const t of TEAMS) {
@@ -968,6 +998,15 @@
       });
       row('Opacità', opacity);
 
+      const del = document.createElement('button');
+      del.className = 'btn btnDanger';
+      del.textContent = 'Elimina';
+      del.type = 'button';
+      del.addEventListener('click', () => { removeSelected(); });
+      inspector.appendChild(del);
+    }
+
+    if (type === 'freehand' || type === 'rect' || type === 'circle') {
       const del = document.createElement('button');
       del.className = 'btn btnDanger';
       del.textContent = 'Elimina';
@@ -1030,6 +1069,7 @@
 
   function render() {
     notesEl.value = state.notes || '';
+    if (state.draw && drawColorInput) drawColorInput.value = state.draw.color || '#ffffff';
     applyLayoutTransform();
     applyLayerVisibility();
     setViewBox(state.view);
@@ -1047,7 +1087,12 @@
   function renderCourtSelectionHint() {
     // mode chip
     const m = state.mode || MODE.SELECT;
-    const label = m === MODE.SELECT ? 'Selezione' : (m === MODE.ARROW ? 'Frecce' : (m === MODE.TEXT ? 'Testo' : 'Pan'));
+    const label = m === MODE.SELECT ? 'Selezione'
+      : (m === MODE.ARROW ? 'Frecce'
+      : (m === MODE.TEXT ? 'Testo'
+      : (m === MODE.FREEHAND ? 'Libera'
+      : (m === MODE.RECT ? 'Rettangolo'
+      : (m === MODE.CIRCLE ? 'Cerchio' : 'Pan')))));
     chipMode.textContent = `Modalità: ${label}`;
   }
 
@@ -1081,6 +1126,7 @@
     if (!LAYOUTS[state.layout]) state.layout = 'full-h';
     if (!state.layers) state.layers = { players:true, drawings:true, text:true };
     if (!state.mode) state.mode = MODE.SELECT;
+    if (!state.draw) state.draw = { color:'#ffffff', width:0.08 };
     state.selection = normalizeSelection(state.selection);
     if (!state.layoutStates) {
       state.layoutStates = {};
@@ -1334,8 +1380,24 @@
     setMode(state.mode === MODE.ARROW ? MODE.SELECT : MODE.ARROW);
   });
 
+  $('#btnFreehand').addEventListener('click', () => {
+    setMode(state.mode === MODE.FREEHAND ? MODE.SELECT : MODE.FREEHAND);
+  });
+
+  $('#btnRect').addEventListener('click', () => {
+    setMode(state.mode === MODE.RECT ? MODE.SELECT : MODE.RECT);
+  });
+
+  $('#btnCircle').addEventListener('click', () => {
+    setMode(state.mode === MODE.CIRCLE ? MODE.SELECT : MODE.CIRCLE);
+  });
+
   $('#btnText').addEventListener('click', () => {
     setMode(state.mode === MODE.TEXT ? MODE.SELECT : MODE.TEXT);
+  });
+
+  $('#btnSelectMode').addEventListener('click', () => {
+    setMode(MODE.SELECT);
   });
 
   $('#btnRotateACW').addEventListener('click', () => rotateTeam('A', 'cw'));
@@ -1345,7 +1407,32 @@
   $('#btnUndo').addEventListener('click', () => { const s = undo(); if (s) replaceState(s); });
   $('#btnRedo').addEventListener('click', () => { const s = redo(); if (s) replaceState(s); });
 
-  $('#btnReset').addEventListener('click', () => { replaceState(DEFAULT_STATE()); });
+  function resetCurrentLayout() {
+    const layoutId = state.layout;
+    const rotation = state.rotation;
+    ensureLayoutState(layoutId);
+    const ls = state.layoutStates[layoutId];
+    const baseView = getBaseView();
+    ls.view = { ...baseView };
+    ls.rotation = rotation;
+    ls.notes = '';
+    ls.objects = [];
+    ls.drawings = [];
+    ls.texts = [];
+    ls.props = [];
+    ls.selection = [];
+    state.view = { ...baseView };
+    state.rotation = rotation;
+    state.notes = '';
+    state.objects = ls.objects;
+    state.drawings = ls.drawings;
+    state.texts = ls.texts;
+    state.props = ls.props;
+    state.selection = [];
+    commit();
+  }
+
+  $('#btnReset').addEventListener('click', () => { resetCurrentLayout(); });
 
   function exportFilename(ext) {
     const d = new Date();
@@ -1477,6 +1564,7 @@
       rotation: state.rotation,
       view: ls.view,
       notes: ls.notes,
+      draw: state.draw,
       layers: state.layers,
       objects: ls.objects,
       drawings: ls.drawings,
@@ -1508,6 +1596,7 @@
       state.rotation = ((next.rotation % 360) + 360) % 360;
       ls.rotation = state.rotation;
     }
+    if (next.draw) state.draw = next.draw;
     if (next.layers) state.layers = next.layers;
     commit();
   }
@@ -1570,6 +1659,13 @@
 
   // Notes binding
   notesEl.addEventListener('input', () => { state.notes = notesEl.value; commit(); });
+
+  if (drawColorInput) {
+    drawColorInput.addEventListener('input', () => {
+      state.draw = state.draw || { color: '#ffffff', width: 0.08 };
+      state.draw.color = drawColorInput.value || '#ffffff';
+    });
+  }
 
   // Layout tabs
   $$('.layoutTabs .tab').forEach((b) => {
@@ -1802,6 +1898,8 @@
   let activePointerId = null;
   let drag = null; // {id, startX,startY, objStartX,objStartY}
   let arrowDraft = null; // {team, start, cur, pathEl}
+  let freehandDraft = null; // {points, pathEl, color, width}
+  let shapeDraft = null; // {kind, start, cur, pathEl, color, width}
   let selectionBox = null;
   const DRAG_SELECT_PX = 6;
   let longPressTimer = null;
@@ -1953,21 +2051,59 @@
       cancelLongPress();
       const sel = primarySelection() ? objById(primarySelection()) : null;
       const team = (sel && sel.team) ? sel.team : 'A';
-      arrowDraft = { team, start: pt, cur: pt };
+      const color = state.draw?.color || '#ffffff';
+      const width = state.draw?.width ?? 0.08;
+      arrowDraft = { team, start: pt, cur: pt, color, width };
       // temp path
       const pathEl = document.createElementNS(svgNS, 'path');
       pathEl.setAttribute('d', `M ${pt.x} ${pt.y} L ${pt.x} ${pt.y}`);
       pathEl.setAttribute('fill', 'none');
       pathEl.setAttribute('stroke', 'currentColor');
-      pathEl.setAttribute('stroke-width', '0.08');
+      pathEl.setAttribute('stroke-width', String(width));
       pathEl.setAttribute('stroke-linecap', 'round');
       pathEl.setAttribute('stroke-linejoin', 'round');
       pathEl.setAttribute('marker-end', 'url(#arrowHead)');
       pathEl.setAttribute('opacity', '0.9');
-      pathEl.style.color = teamColor(team);
+      pathEl.style.color = color || teamColor(team);
       pathEl.style.pointerEvents = 'none';
       gDrawings.appendChild(pathEl);
       arrowDraft.pathEl = pathEl;
+      return;
+    }
+
+    if (mode === MODE.FREEHAND) {
+      cancelLongPress();
+      const color = state.draw?.color || '#ffffff';
+      const width = state.draw?.width ?? 0.08;
+      const pathEl = document.createElementNS(svgNS, 'path');
+      pathEl.setAttribute('d', `M ${pt.x} ${pt.y}`);
+      pathEl.setAttribute('fill', 'none');
+      pathEl.setAttribute('stroke', color);
+      pathEl.setAttribute('stroke-width', String(width));
+      pathEl.setAttribute('stroke-linecap', 'round');
+      pathEl.setAttribute('stroke-linejoin', 'round');
+      pathEl.setAttribute('opacity', '0.9');
+      pathEl.style.pointerEvents = 'none';
+      gDrawings.appendChild(pathEl);
+      freehandDraft = { points: [pt], pathEl, color, width };
+      return;
+    }
+
+    if (mode === MODE.RECT || mode === MODE.CIRCLE) {
+      cancelLongPress();
+      const color = state.draw?.color || '#ffffff';
+      const width = state.draw?.width ?? 0.08;
+      const pathEl = document.createElementNS(svgNS, 'path');
+      pathEl.setAttribute('d', `M ${pt.x} ${pt.y} L ${pt.x} ${pt.y}`);
+      pathEl.setAttribute('fill', 'none');
+      pathEl.setAttribute('stroke', color);
+      pathEl.setAttribute('stroke-width', String(width));
+      pathEl.setAttribute('stroke-linecap', 'round');
+      pathEl.setAttribute('stroke-linejoin', 'round');
+      pathEl.setAttribute('opacity', '0.9');
+      pathEl.style.pointerEvents = 'none';
+      gDrawings.appendChild(pathEl);
+      shapeDraft = { kind: mode === MODE.RECT ? 'rect' : 'circle', start: pt, cur: pt, pathEl, color, width };
       return;
     }
 
@@ -2139,6 +2275,36 @@
       return;
     }
 
+    if (freehandDraft) {
+      const last = freehandDraft.points[freehandDraft.points.length - 1];
+      if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > 0.04) {
+        freehandDraft.points.push(pt);
+        const d = freehandDraft.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+        freehandDraft.pathEl.setAttribute('d', d);
+      }
+      return;
+    }
+
+    if (shapeDraft) {
+      shapeDraft.cur = pt;
+      const x1 = shapeDraft.start.x;
+      const y1 = shapeDraft.start.y;
+      const x2 = pt.x;
+      const y2 = pt.y;
+      if (shapeDraft.kind === 'rect') {
+        const d = `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2} L ${x1} ${y2} Z`;
+        shapeDraft.pathEl.setAttribute('d', d);
+      } else {
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        const rx = Math.abs(x2 - x1) / 2;
+        const ry = Math.abs(y2 - y1) / 2;
+        const d = `M ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy}`;
+        shapeDraft.pathEl.setAttribute('d', d);
+      }
+      return;
+    }
+
     if (drag?.type === 'move-multi') {
       cancelLongPress();
       const dx = pt.x - drag.start.x;
@@ -2209,13 +2375,57 @@
         const mx = (s.x + pt.x) / 2;
         const my = (s.y + pt.y) / 2;
         const d = `M ${s.x} ${s.y} Q ${mx} ${my} ${pt.x} ${pt.y}`;
-        state.drawings.push({ id: ID(), type:'arrow', team: arrowDraft.team, path: d, style:{ width:'0.12', opacity:'0.9' } });
+        state.drawings.push({ id: ID(), type:'arrow', team: arrowDraft.team, path: d, style:{ width: String(arrowDraft.width ?? 0.08), opacity:'0.9', color: arrowDraft.color } });
         setSelection(state.drawings[state.drawings.length - 1].id);
         commit();
       } else {
         render();
       }
       arrowDraft = null;
+      return;
+    }
+
+    if (freehandDraft) {
+      const pts = freehandDraft.points;
+      gDrawings.removeChild(freehandDraft.pathEl);
+      if (pts.length > 1) {
+        const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+        state.drawings.push({ id: ID(), type:'freehand', path: d, style:{ width: String(freehandDraft.width ?? 0.08), opacity:'0.9', color: freehandDraft.color } });
+        setSelection(state.drawings[state.drawings.length - 1].id);
+        commit();
+      } else {
+        render();
+      }
+      freehandDraft = null;
+      return;
+    }
+
+    if (shapeDraft) {
+      const x1 = shapeDraft.start.x;
+      const y1 = shapeDraft.start.y;
+      const x2 = shapeDraft.cur.x;
+      const y2 = shapeDraft.cur.y;
+      const w = Math.abs(x2 - x1);
+      const h = Math.abs(y2 - y1);
+      gDrawings.removeChild(shapeDraft.pathEl);
+      if (w > 0.2 || h > 0.2) {
+        let d = '';
+        if (shapeDraft.kind === 'rect') {
+          d = `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2} L ${x1} ${y2} Z`;
+        } else {
+          const cx = (x1 + x2) / 2;
+          const cy = (y1 + y2) / 2;
+          const rx = Math.abs(x2 - x1) / 2;
+          const ry = Math.abs(y2 - y1) / 2;
+          d = `M ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy}`;
+        }
+        state.drawings.push({ id: ID(), type: shapeDraft.kind, path: d, style:{ width: String(shapeDraft.width ?? 0.08), opacity:'0.9', color: shapeDraft.color } });
+        setSelection(state.drawings[state.drawings.length - 1].id);
+        commit();
+      } else {
+        render();
+      }
+      shapeDraft = null;
       return;
     }
 
@@ -2249,6 +2459,8 @@
   svg.addEventListener('pointercancel', () => {
     cancelLongPress();
     arrowDraft = null;
+    freehandDraft = null;
+    shapeDraft = null;
     if (selectionBox?.rectEl) selectionBox.rectEl.remove();
     selectionBox = null;
     drag = null;
