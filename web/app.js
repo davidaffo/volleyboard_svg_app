@@ -880,6 +880,7 @@
       el.setAttribute('x', '0');
       el.setAttribute('y', '0');
       el.setAttribute('font-size', t.style?.size ?? '0.55');
+      el.setAttribute('font-family', `"Excalifont","Comic Sans MS","Marker Felt","Bradley Hand","Segoe Print",cursive`);
       el.setAttribute('fill', 'currentColor');
       el.style.color = t.style?.color ?? teamColor(t.team);
       if (angle || rot) el.setAttribute('transform', `rotate(${-(angle) + rot})`);
