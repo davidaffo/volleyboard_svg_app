@@ -134,9 +134,7 @@
   const notesEl = $('#notes');
   const statObjects = $('#statObjects');
   const chipMode = $('#chipMode');
-  const chipZoom = $('#chipZoom');
   const toolGrid = $('#toolGrid');
-  const zoomSlider = $('#zoomSlider');
   const drawColorInput = $('#drawColor');
   const ENABLE_LONG_PRESS_MENU = false;
 
@@ -325,9 +323,6 @@
     const nextView = v;
     state.view = nextView;
     svg.setAttribute('viewBox', `${nextView.x} ${nextView.y} ${nextView.w} ${nextView.h}`);
-    const zoom = baseView.w / nextView.w;
-    chipZoom.textContent = `Zoom: ${Math.round(zoom*100)}%`;
-    if (zoomSlider) zoomSlider.value = String(Math.round(zoom*100));
   }
 
   function applyLayoutTransform() {
@@ -1489,6 +1484,11 @@
     B: DEFAULT_SPOTS_A.map((p) => ({ x: COURT_W - p.x, y: COURT_H - p.y, n: p.n })),
   };
 
+  function getDefaultSpots(team) {
+    if (state.layout === 'half') return DEFAULT_SPOTS_A;
+    return DEFAULT_SPOTS[team] || DEFAULT_SPOTS_A;
+  }
+
   const DEFAULT_ROLE_BY_LABEL = {
     '1': 'P',
     '2': 'S1',
@@ -1501,7 +1501,7 @@
   function insertDefaultTeams(mode) {
     presetEmpty();
     const addTeam = (team) => {
-      for (const p of DEFAULT_SPOTS[team]) {
+      for (const p of getDefaultSpots(team)) {
         const role = DEFAULT_ROLE_BY_LABEL[p.n] || 'X';
         state.objects.push({ id: ID(), type:'player', team, x:p.x, y:p.y, role, label:'' });
       }
@@ -1513,7 +1513,7 @@
   }
 
   function rotateTeam(team, dir = 'cw') {
-    const spots = DEFAULT_SPOTS[team];
+    const spots = getDefaultSpots(team);
     if (!spots) return;
     const players = state.objects.filter(o => o.type==='player' && o.team===team);
     if (players.length === 0) return;
@@ -1839,20 +1839,6 @@
   $('#btnExport').addEventListener('click', () => openExport());
   $('#btnImport').addEventListener('click', () => openImport());
   $('#btnExportImg').addEventListener('click', () => exportPng());
-
-  if (zoomSlider) {
-    zoomSlider.addEventListener('input', () => {
-      const base = getBaseView();
-      const z = clamp(Number(zoomSlider.value) / 100, 0.5, 2);
-      const w = base.w / z;
-      const h = base.h / z;
-      const cx = state.view.x + state.view.w / 2;
-      const cy = state.view.y + state.view.h / 2;
-      setViewBox({ x: cx - w / 2, y: cy - h / 2, w, h });
-      state.view = { x: cx - w / 2, y: cy - h / 2, w, h };
-      commit();
-    });
-  }
 
   // Notes binding
   notesEl.addEventListener('input', () => { state.notes = notesEl.value; commit(); });
@@ -2844,27 +2830,7 @@
     }
   }, true);
 
-  // Wheel zoom (desktop). Use Alt+wheel for zoom, wheel alone scrolls page.
-  svg.addEventListener('wheel', (e) => {
-    if (drag) return;
-    if (!e.altKey) return;
-    e.preventDefault();
-    const delta = Math.sign(e.deltaY);
-    const factor = delta > 0 ? 1.08 : 0.92;
-
-    const pt = svgPointFromClient(e.clientX, e.clientY);
-    const v = state.view;
-    const newW = clamp(v.w * factor, 8, 40);
-    const newH = newW * (v.h / v.w);
-
-    const rx = (pt.x - v.x) / v.w;
-    const ry = (pt.y - v.y) / v.h;
-
-    const nx = pt.x - rx * newW;
-    const ny = pt.y - ry * newH;
-    state.view = { x: nx, y: ny, w: newW, h: newH };
-    setViewBox(state.view);
-  }, { passive: false });
+  // Wheel zoom disabled
 
   // Tap on empty to set text mode quickly if T is active
   svg.addEventListener('dblclick', (e) => {
