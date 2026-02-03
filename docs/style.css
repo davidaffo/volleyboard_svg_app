@@ -421,6 +421,17 @@ body{
 .menuGrid{display:grid; grid-template-columns: 1fr 1fr; gap:8px}
 @media (max-width: 980px){
   body{overflow:auto}
-  .main{grid-template-columns: 1fr; height:auto}
-  .stage{height: 62vh; min-height: 420px}
+  .main{
+    grid-template-columns: 180px 1fr;
+    grid-template-rows: auto auto;
+    height:auto;
+    gap:10px;
+    padding:10px;
+  }
+  .toolGrid{grid-template-columns: repeat(2, minmax(0, 1fr))}
+  .toolPreview{width:36px; height:36px}
+  .toolLabel{font-size:10px}
+  .toolBtn{border-radius:12px}
+  .stage{height: 62vh; min-height: 360px}
+  .side{grid-column: 1 / -1}
 }
