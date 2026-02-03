@@ -11,11 +11,338 @@
 
   const defaultRotationFor = (layoutId) => (layoutId === 'full-v' ? 90 : (layoutId === 'half' ? 270 : 0));
 
+  const I18N = {
+    en: {
+      'app.title': 'VolleyBoard SVG',
+      'lang.name': 'English',
+      'ui.language': 'Language',
+      'toolbar.addPlayer.text': '+ Player',
+      'toolbar.addPlayer.title': 'Add player',
+      'toolbar.arrow.text': '↗ Arrows',
+      'toolbar.arrow.title': 'Draw arrows',
+      'toolbar.freehand.text': '✎ Free',
+      'toolbar.freehand.title': 'Draw freehand',
+      'toolbar.rect.text': '▭ Rect',
+      'toolbar.rect.title': 'Draw rectangle',
+      'toolbar.circle.text': '◯ Circle',
+      'toolbar.circle.title': 'Draw circle',
+      'toolbar.select.text': '↖ Select',
+      'toolbar.select.title': 'Selection mode',
+      'toolbar.color.label': 'Color',
+      'toolbar.color.title': 'Drawing color',
+      'toolbar.text.title': 'Add text',
+      'toolbar.rotateACW.title': 'Rotate team A (clockwise)',
+      'toolbar.rotateACCW.title': 'Rotate team A (counterclockwise)',
+      'toolbar.rotateBCW.title': 'Rotate team B (clockwise)',
+      'toolbar.rotateBCCW.title': 'Rotate team B (counterclockwise)',
+      'toolbar.undo.title': 'Undo',
+      'toolbar.redo.title': 'Redo',
+      'toolbar.reset.title': 'Reset',
+      'toolbar.reset.text': 'Reset',
+      'toolbar.exportImg.title': 'Export PNG image',
+      'toolbar.exportImg.text': 'Image',
+      'toolbar.export.title': 'Export JSON',
+      'toolbar.export.text': 'Export',
+      'toolbar.import.title': 'Import JSON',
+      'toolbar.import.text': 'Import',
+      'toolbox.title': 'Tools',
+      'layout.full': 'Full court',
+      'layout.fullVertical': 'Full court (vert.)',
+      'layout.half': 'Half court',
+      'rotate.left.title': 'Rotate left',
+      'rotate.right.title': 'Rotate right',
+      'inspector.header': 'Selected object',
+      'inspector.none': 'No selection',
+      'hud.hint': 'Drag: move objects • Space+drag: pan • Long press: menu',
+      'panel.addRole.title': 'Add player by role',
+      'label.team': 'Team',
+      'label.role': 'Role',
+      'label.number': 'Number',
+      'placeholder.number': 'e.g. 7',
+      'action.add': 'Add',
+      'panel.presets.title': 'Default teams',
+      'preset.teamA': 'Team A only',
+      'preset.teamB': 'Team B only',
+      'preset.teams': 'A + B (6 vs 6)',
+      'preset.empty': 'Empty court',
+      'panel.notes.title': 'Notes',
+      'placeholder.notes': 'Free notes (saved in state)...',
+      'panel.state.title': 'State',
+      'state.objects': 'Objects',
+      'state.layers': 'Layers',
+      'state.layers.value': 'Players • Ball • Drawings • Text',
+      'state.format': 'Format',
+      'state.format.value': 'SVG + JSON',
+      'dialog.io.title': 'Import/Export',
+      'dialog.close': 'Close',
+      'dialog.ok': 'OK',
+      'dialog.menu.title': 'Actions',
+      'mode.label': 'Mode: {label}',
+      'mode.select': 'Select',
+      'mode.arrow': 'Arrows',
+      'mode.text': 'Text',
+      'mode.freehand': 'Freehand',
+      'mode.rect': 'Rectangle',
+      'mode.circle': 'Circle',
+      'mode.pan': 'Pan',
+      'inspector.selectedCount': '{count} elements selected',
+      'action.deleteSelected': 'Delete selected',
+      'inspector.type': 'Type: {type}',
+      'type.player': 'Player',
+      'type.arrow': 'Arrow',
+      'type.freehand': 'Freehand',
+      'type.rect': 'Rectangle',
+      'type.circle': 'Circle',
+      'type.text': 'Text',
+      'type.prop': 'Prop',
+      'type.ball': 'Ball',
+      'type.unknown': 'Unknown',
+      'inspector.overrideText': 'Override text',
+      'inspector.number': 'Number',
+      'inspector.role': 'Role',
+      'inspector.team': 'Team',
+      'inspector.delete': 'Delete',
+      'inspector.color': 'Color',
+      'inspector.thickness': 'Thickness',
+      'inspector.opacity': 'Opacity',
+      'inspector.text': 'Text',
+      'inspector.size': 'Size',
+      'inspector.hideBall': 'Hide ball',
+      'inspector.showBall': 'Show ball',
+      'default.text': 'Text',
+      'menu.title.edit': 'Edit',
+      'menu.title.actions': 'Actions',
+      'menu.addPlayerA': 'Add player A',
+      'menu.addPlayerB': 'Add player B',
+      'menu.addText': 'Add text',
+      'menu.arrows': 'Arrows',
+      'menu.reset': 'Reset',
+      'menu.duplicate': 'Duplicate',
+      'menu.delete': 'Delete',
+      'menu.arrowType': 'Arrow type',
+      'menu.arrowType.straight': 'Straight',
+      'menu.arrowType.curve': 'Curve',
+      'menu.arrowType.angle': 'Angle',
+      'menu.stroke': 'Stroke',
+      'menu.stroke.solid': 'Solid',
+      'menu.stroke.dash': 'Dashed',
+      'menu.stroke.dot': 'Dotted',
+      'export.title': 'Export JSON',
+      'export.copy': 'Copy',
+      'import.title': 'Import JSON',
+      'import.cta': 'Import',
+      'import.invalidJson': 'Invalid JSON',
+      'team.A': 'Team A',
+      'team.B': 'Team B',
+      'role.P': 'Setter (P)',
+      'role.S1': 'Outside Hitter 1 (S1)',
+      'role.C2': 'Middle Blocker 2 (C2)',
+      'role.O': 'Opposite (O)',
+      'role.S2': 'Outside Hitter 2 (S2)',
+      'role.C1': 'Middle Blocker 1 (C1)',
+      'role.S': 'Outside Hitter (S)',
+      'role.C': 'Middle Blocker (C)',
+      'role.L': 'Libero (L)',
+      'role.X': 'Other (X)',
+      'tool.player': 'Player',
+      'tool.role.P': 'P',
+      'tool.role.C': 'C',
+      'tool.role.S': 'S',
+      'tool.role.L': 'L',
+      'tool.role.S1': 'S1',
+      'tool.role.C2': 'C2',
+      'tool.role.O': 'O',
+      'tool.role.S2': 'S2',
+      'tool.role.C1': 'C1',
+      'tool.ball': 'Ball',
+      'tool.cone.red': 'Red cone',
+      'tool.cone.yellow': 'Yellow cone',
+      'tool.cone.blue': 'Blue cone',
+      'tool.cone.green': 'Green cone',
+      'tool.ballCart': 'Ball cart',
+      'tool.basket': 'Basket',
+      'tool.coach': 'Coach',
+      'tool.ladder': 'Agility ladder',
+      'tool.target': 'Target',
+    },
+    it: {
+      'app.title': 'VolleyBoard SVG',
+      'lang.name': 'Italiano',
+      'ui.language': 'Lingua',
+      'toolbar.addPlayer.text': '+ Giocatore',
+      'toolbar.addPlayer.title': 'Aggiungi giocatore',
+      'toolbar.arrow.text': '↗ Frecce',
+      'toolbar.arrow.title': 'Disegna frecce',
+      'toolbar.freehand.text': '✎ Libera',
+      'toolbar.freehand.title': 'Disegna a mano libera',
+      'toolbar.rect.text': '▭ Rett',
+      'toolbar.rect.title': 'Disegna rettangolo',
+      'toolbar.circle.text': '◯ Cerchio',
+      'toolbar.circle.title': 'Disegna cerchio',
+      'toolbar.select.text': '↖ Selezione',
+      'toolbar.select.title': 'Modalità selezione',
+      'toolbar.color.label': 'Colore',
+      'toolbar.color.title': 'Colore disegno',
+      'toolbar.text.title': 'Aggiungi testo',
+      'toolbar.rotateACW.title': 'Ruota squadra A (orario)',
+      'toolbar.rotateACCW.title': 'Ruota squadra A (antiorario)',
+      'toolbar.rotateBCW.title': 'Ruota squadra B (orario)',
+      'toolbar.rotateBCCW.title': 'Ruota squadra B (antiorario)',
+      'toolbar.undo.title': 'Annulla',
+      'toolbar.redo.title': 'Ripristina',
+      'toolbar.reset.title': 'Reset',
+      'toolbar.reset.text': 'Reset',
+      'toolbar.exportImg.title': 'Esporta immagine PNG',
+      'toolbar.exportImg.text': 'Immagine',
+      'toolbar.export.title': 'Esporta JSON',
+      'toolbar.export.text': 'Export',
+      'toolbar.import.title': 'Importa JSON',
+      'toolbar.import.text': 'Import',
+      'toolbox.title': 'Strumenti',
+      'layout.full': 'Campo intero',
+      'layout.fullVertical': 'Campo intero (vert.)',
+      'layout.half': 'Mezzo campo',
+      'rotate.left.title': 'Ruota sinistra',
+      'rotate.right.title': 'Ruota destra',
+      'inspector.header': 'Oggetto selezionato',
+      'inspector.none': 'Nessuna selezione',
+      'hud.hint': 'Drag: sposta oggetti • Space+drag: pan • Tap lungo: menu',
+      'panel.addRole.title': 'Aggiungi giocatore per ruolo',
+      'label.team': 'Squadra',
+      'label.role': 'Ruolo',
+      'label.number': 'Numero',
+      'placeholder.number': 'Es. 7',
+      'action.add': 'Aggiungi',
+      'panel.presets.title': 'Squadre di default',
+      'preset.teamA': 'Solo squadra A',
+      'preset.teamB': 'Solo squadra B',
+      'preset.teams': 'A + B (6 vs 6)',
+      'preset.empty': 'Campo vuoto',
+      'panel.notes.title': 'Note',
+      'placeholder.notes': 'Annotazioni libere (salvate nello stato)...',
+      'panel.state.title': 'Stato',
+      'state.objects': 'Oggetti',
+      'state.layers': 'Layer',
+      'state.layers.value': 'Giocatori • Palla • Disegni • Testo',
+      'state.format': 'Formato',
+      'state.format.value': 'SVG + JSON',
+      'dialog.io.title': 'Import/Export',
+      'dialog.close': 'Chiudi',
+      'dialog.ok': 'OK',
+      'dialog.menu.title': 'Azioni',
+      'mode.label': 'Modalità: {label}',
+      'mode.select': 'Selezione',
+      'mode.arrow': 'Frecce',
+      'mode.text': 'Testo',
+      'mode.freehand': 'Libera',
+      'mode.rect': 'Rettangolo',
+      'mode.circle': 'Cerchio',
+      'mode.pan': 'Pan',
+      'inspector.selectedCount': '{count} elementi selezionati',
+      'action.deleteSelected': 'Elimina selezionati',
+      'inspector.type': 'Tipo: {type}',
+      'type.player': 'Giocatore',
+      'type.arrow': 'Freccia',
+      'type.freehand': 'Disegno',
+      'type.rect': 'Rettangolo',
+      'type.circle': 'Cerchio',
+      'type.text': 'Testo',
+      'type.prop': 'Oggetto',
+      'type.ball': 'Palla',
+      'type.unknown': 'Sconosciuto',
+      'inspector.overrideText': 'Testo speciale',
+      'inspector.number': 'Numero',
+      'inspector.role': 'Ruolo',
+      'inspector.team': 'Squadra',
+      'inspector.delete': 'Elimina',
+      'inspector.color': 'Colore',
+      'inspector.thickness': 'Spessore',
+      'inspector.opacity': 'Opacità',
+      'inspector.text': 'Testo',
+      'inspector.size': 'Dimensione',
+      'inspector.hideBall': 'Nascondi palla',
+      'inspector.showBall': 'Mostra palla',
+      'default.text': 'Testo',
+      'menu.title.edit': 'Modifica',
+      'menu.title.actions': 'Azioni',
+      'menu.addPlayerA': 'Aggiungi giocatore A',
+      'menu.addPlayerB': 'Aggiungi giocatore B',
+      'menu.addText': 'Aggiungi testo',
+      'menu.arrows': 'Frecce',
+      'menu.reset': 'Reset',
+      'menu.duplicate': 'Duplica',
+      'menu.delete': 'Elimina',
+      'menu.arrowType': 'Tipo freccia',
+      'menu.arrowType.straight': 'Dritta',
+      'menu.arrowType.curve': 'Curva',
+      'menu.arrowType.angle': 'Angolo',
+      'menu.stroke': 'Tratto',
+      'menu.stroke.solid': 'Pieno',
+      'menu.stroke.dash': 'Tratteggio',
+      'menu.stroke.dot': 'Puntini',
+      'export.title': 'Export JSON',
+      'export.copy': 'Copia',
+      'import.title': 'Import JSON',
+      'import.cta': 'Importa',
+      'import.invalidJson': 'JSON non valido',
+      'team.A': 'Squadra A',
+      'team.B': 'Squadra B',
+      'role.P': 'Palleggiatore (P)',
+      'role.S1': 'Schiacciatore 1 (S1)',
+      'role.C2': 'Centrale 2 (C2)',
+      'role.O': 'Opposto (O)',
+      'role.S2': 'Schiacciatore 2 (S2)',
+      'role.C1': 'Centrale 1 (C1)',
+      'role.S': 'Schiacciatore (S)',
+      'role.C': 'Centrale (C)',
+      'role.L': 'Libero (L)',
+      'role.X': 'Altro (X)',
+      'tool.player': 'Gioc',
+      'tool.role.P': 'P',
+      'tool.role.C': 'C',
+      'tool.role.S': 'S',
+      'tool.role.L': 'L',
+      'tool.role.S1': 'S1',
+      'tool.role.C2': 'C2',
+      'tool.role.O': 'O',
+      'tool.role.S2': 'S2',
+      'tool.role.C1': 'C1',
+      'tool.ball': 'Palla',
+      'tool.cone.red': 'Cinesino rosso',
+      'tool.cone.yellow': 'Cinesino giallo',
+      'tool.cone.blue': 'Cinesino blu',
+      'tool.cone.green': 'Cinesino verde',
+      'tool.ballCart': 'Carrello palloni',
+      'tool.basket': 'Canestro',
+      'tool.coach': 'Allenatore',
+      'tool.ladder': 'Scaletta',
+      'tool.target': 'Bersaglio',
+    },
+  };
+
+  const DEFAULT_LANG = 'en';
+  const LANG_KEY = 'volleyboard_lang';
+  let currentLang = DEFAULT_LANG;
+
+  const t = (key, vars) => {
+    const table = I18N[currentLang] || I18N[DEFAULT_LANG] || {};
+    let val = table[key] ?? I18N[DEFAULT_LANG]?.[key] ?? key;
+    if (vars) {
+      for (const [k, v] of Object.entries(vars)) {
+        val = val.split(`{${k}}`).join(String(v));
+      }
+    }
+    return val;
+  };
+
+  const DEFAULT_TEXT_PLACEHOLDERS = new Set(
+    Object.values(I18N).map((tbl) => tbl['default.text']).filter(Boolean)
+  );
 
   const LAYOUTS = {
-    'full-h': { id: 'full-h', label: 'Campo intero', view: { x: -2, y: -2, w: 22, h: 13 } },
-    'full-v': { id: 'full-v', label: 'Campo intero (vert.)', view: { x: -2, y: -2, w: 13, h: 22 } },
-    'half': { id: 'half', label: 'Mezzo campo', view: { x: -1, y: -1, w: 11, h: 11 } },
+    'full-h': { id: 'full-h', labelKey: 'layout.full', view: { x: -2, y: -2, w: 22, h: 13 } },
+    'full-v': { id: 'full-v', labelKey: 'layout.fullVertical', view: { x: -2, y: -2, w: 13, h: 22 } },
+    'half': { id: 'half', labelKey: 'layout.half', view: { x: -1, y: -1, w: 11, h: 11 } },
   };
 
   const DEFAULT_STATE = () => ({
@@ -37,44 +364,44 @@
   const ID = () => 'id_' + Math.random().toString(16).slice(2) + '_' + Date.now().toString(16);
 
   const TEAMS = [
-    { id: 'A', name: 'Squadra A' },
-    { id: 'B', name: 'Squadra B' },
+    { id: 'A', nameKey: 'team.A' },
+    { id: 'B', nameKey: 'team.B' },
   ];
 
   const ROLES = [
-    { id: 'P', name: 'Palleggiatore (P)' },
-    { id: 'S1', name: 'Schiacciatore 1 (S1)' },
-    { id: 'C2', name: 'Centrale 2 (C2)' },
-    { id: 'O', name: 'Opposto (O)' },
-    { id: 'S2', name: 'Schiacciatore 2 (S2)' },
-    { id: 'C1', name: 'Centrale 1 (C1)' },
-    { id: 'S', name: 'Schiacciatore (S)' },
-    { id: 'C', name: 'Centrale (C)' },
-    { id: 'L', name: 'Libero (L)' },
-    { id: 'X', name: 'Altro (X)' },
+    { id: 'P', nameKey: 'role.P' },
+    { id: 'S1', nameKey: 'role.S1' },
+    { id: 'C2', nameKey: 'role.C2' },
+    { id: 'O', nameKey: 'role.O' },
+    { id: 'S2', nameKey: 'role.S2' },
+    { id: 'C1', nameKey: 'role.C1' },
+    { id: 'S', nameKey: 'role.S' },
+    { id: 'C', nameKey: 'role.C' },
+    { id: 'L', nameKey: 'role.L' },
+    { id: 'X', nameKey: 'role.X' },
   ];
 
   const TOOLBOX_ITEMS = [
-    { id:'player-blank', label:'Gioc', kind:'player', role:'NONE' },
-    { id:'role-P', label:'P', kind:'player', role:'P' },
-    { id:'role-C', label:'C', kind:'player', role:'C' },
-    { id:'role-S', label:'S', kind:'player', role:'S' },
-    { id:'role-L', label:'L', kind:'player', role:'L' },
-    { id:'role-S1', label:'S1', kind:'player', role:'S1' },
-    { id:'role-C2', label:'C2', kind:'player', role:'C2' },
-    { id:'role-O', label:'O', kind:'player', role:'O' },
-    { id:'role-S2', label:'S2', kind:'player', role:'S2' },
-    { id:'role-C1', label:'C1', kind:'player', role:'C1' },
-    { id:'ball', label:'Palla', kind:'ball' },
-    { id:'cone-red', label:'Cinesino rosso', kind:'cone', color:'#ef4444' },
-    { id:'cone-yellow', label:'Cinesino giallo', kind:'cone', color:'#f59e0b' },
-    { id:'cone-blue', label:'Cinesino blu', kind:'cone', color:'#3b82f6' },
-    { id:'cone-green', label:'Cinesino verde', kind:'cone', color:'#10b981' },
-    { id:'ball-cart', label:'Carrello palloni', kind:'ball-cart', previewScale: 0.8 },
-    { id:'basket', label:'Canestro', kind:'basket', previewScale: 0.8 },
-    { id:'coach', label:'Allenatore', kind:'coach' },
-    { id:'ladder', label:'Scaletta', kind:'ladder', previewScale: 0.6 },
-    { id:'target', label:'Bersaglio', kind:'target' },
+    { id:'player-blank', labelKey:'tool.player', kind:'player', role:'NONE' },
+    { id:'role-P', labelKey:'tool.role.P', kind:'player', role:'P' },
+    { id:'role-C', labelKey:'tool.role.C', kind:'player', role:'C' },
+    { id:'role-S', labelKey:'tool.role.S', kind:'player', role:'S' },
+    { id:'role-L', labelKey:'tool.role.L', kind:'player', role:'L' },
+    { id:'role-S1', labelKey:'tool.role.S1', kind:'player', role:'S1' },
+    { id:'role-C2', labelKey:'tool.role.C2', kind:'player', role:'C2' },
+    { id:'role-O', labelKey:'tool.role.O', kind:'player', role:'O' },
+    { id:'role-S2', labelKey:'tool.role.S2', kind:'player', role:'S2' },
+    { id:'role-C1', labelKey:'tool.role.C1', kind:'player', role:'C1' },
+    { id:'ball', labelKey:'tool.ball', kind:'ball' },
+    { id:'cone-red', labelKey:'tool.cone.red', kind:'cone', color:'#ef4444' },
+    { id:'cone-yellow', labelKey:'tool.cone.yellow', kind:'cone', color:'#f59e0b' },
+    { id:'cone-blue', labelKey:'tool.cone.blue', kind:'cone', color:'#3b82f6' },
+    { id:'cone-green', labelKey:'tool.cone.green', kind:'cone', color:'#10b981' },
+    { id:'ball-cart', labelKey:'tool.ballCart', kind:'ball-cart', previewScale: 0.8 },
+    { id:'basket', labelKey:'tool.basket', kind:'basket', previewScale: 0.8 },
+    { id:'coach', labelKey:'tool.coach', kind:'coach' },
+    { id:'ladder', labelKey:'tool.ladder', kind:'ladder', previewScale: 0.6 },
+    { id:'target', labelKey:'tool.target', kind:'target' },
   ];
 
 
@@ -136,7 +463,90 @@
   const chipMode = $('#chipMode');
   const toolGrid = $('#toolGrid');
   const drawColorInput = $('#drawColor');
+  const langSelect = $('#langSelect');
   const ENABLE_LONG_PRESS_MENU = false;
+
+  function applyI18n(root=document) {
+    $$('[data-i18n]', root).forEach((el) => {
+      const key = el.getAttribute('data-i18n');
+      if (key) el.textContent = t(key);
+    });
+    $$('[data-i18n-title]', root).forEach((el) => {
+      const key = el.getAttribute('data-i18n-title');
+      if (key) el.setAttribute('title', t(key));
+    });
+    $$('[data-i18n-placeholder]', root).forEach((el) => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      if (key) el.setAttribute('placeholder', t(key));
+    });
+    $$('[data-i18n-aria-label]', root).forEach((el) => {
+      const key = el.getAttribute('data-i18n-aria-label');
+      if (key) el.setAttribute('aria-label', t(key));
+    });
+  }
+
+  function buildLangOptions() {
+    if (!langSelect) return;
+    langSelect.innerHTML = '';
+    for (const [code, table] of Object.entries(I18N)) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = table['lang.name'] || code;
+      langSelect.appendChild(opt);
+    }
+  }
+
+  function refreshAddRoleSelects() {
+    const addTeamSel = $('#addTeam');
+    const addRoleSel = $('#addRole');
+    if (!addTeamSel || !addRoleSel) return;
+    const prevTeam = addTeamSel.value || 'A';
+    const prevRole = addRoleSel.value || 'X';
+    addTeamSel.innerHTML = '';
+    for (const team of TEAMS) {
+      const opt = document.createElement('option');
+      opt.value = team.id;
+      opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
+      addTeamSel.appendChild(opt);
+    }
+    addRoleSel.innerHTML = '';
+    for (const role of ROLES) {
+      const opt = document.createElement('option');
+      opt.value = role.id;
+      opt.textContent = role.nameKey ? t(role.nameKey) : role.id;
+      addRoleSel.appendChild(opt);
+    }
+    addTeamSel.value = prevTeam;
+    addRoleSel.value = prevRole;
+  }
+
+  function setLang(next, opts = {}) {
+    const { persist = true } = opts;
+    const lang = I18N[next] ? next : DEFAULT_LANG;
+    currentLang = lang;
+    document.documentElement.lang = lang;
+    document.title = t('app.title');
+    if (persist) {
+      try { localStorage.setItem(LANG_KEY, lang); } catch {}
+    }
+    applyI18n();
+    buildLangOptions();
+    if (langSelect) langSelect.value = lang;
+    refreshAddRoleSelects();
+    renderToolbox();
+    render();
+  }
+
+  function initLang() {
+    let saved = null;
+    try { saved = localStorage.getItem(LANG_KEY); } catch {}
+    const initial = saved && I18N[saved] ? saved : DEFAULT_LANG;
+    buildLangOptions();
+    if (langSelect) {
+      langSelect.addEventListener('change', () => setLang(langSelect.value));
+    }
+    setLang(initial, { persist: false });
+  }
 
   // Build SVG
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -1059,14 +1469,14 @@
     inspector.innerHTML = '';
     const selIds = getSelection();
     if (!selIds.length) {
-      inspector.innerHTML = `<div class="muted">Nessuna selezione</div>`;
+      inspector.innerHTML = `<div class="muted">${t('inspector.none')}</div>`;
       return;
     }
     if (selIds.length > 1) {
-      inspector.innerHTML = `<div class="muted">${selIds.length} elementi selezionati</div>`;
+      inspector.innerHTML = `<div class="muted">${t('inspector.selectedCount', { count: selIds.length })}</div>`;
       const del = document.createElement('button');
       del.className = 'btn btnDanger';
-      del.textContent = 'Elimina selezionati';
+      del.textContent = t('action.deleteSelected');
       del.type = 'button';
       del.addEventListener('click', () => { removeSelected(); });
       inspector.appendChild(del);
@@ -1075,7 +1485,7 @@
 
     const sel = objById(selIds[0]);
     if (!sel) {
-      inspector.innerHTML = `<div class="muted">Nessuna selezione</div>`;
+      inspector.innerHTML = `<div class="muted">${t('inspector.none')}</div>`;
       return;
     }
 
@@ -1095,45 +1505,48 @@
     const type = sel.type || (sel.id === 'ball' ? 'ball' : 'unknown');
     const typeEl = document.createElement('div');
     typeEl.className = 'muted';
-    typeEl.textContent = `Tipo: ${type}`;
+    const typeKey = `type.${type}`;
+    const hasType = (I18N[currentLang]?.[typeKey] || I18N[DEFAULT_LANG]?.[typeKey]);
+    const typeLabel = hasType ? t(typeKey) : t('type.unknown');
+    typeEl.textContent = t('inspector.type', { type: typeLabel });
     inspector.appendChild(typeEl);
 
     if (type === 'player') {
       const overrideInput = document.createElement('input');
       overrideInput.value = sel.overrideText || '';
       overrideInput.addEventListener('input', () => { sel.overrideText = overrideInput.value; commit(); });
-      row('Testo speciale', overrideInput);
+      row(t('inspector.overrideText'), overrideInput);
 
       const labelInput = document.createElement('input');
       labelInput.value = sel.label || '';
       labelInput.addEventListener('input', () => { sel.label = labelInput.value; commit(); });
-      row('Numero', labelInput);
+      row(t('inspector.number'), labelInput);
 
       const roleSel = document.createElement('select');
       for (const r of ROLES) {
         const opt = document.createElement('option');
         opt.value = r.id;
-        opt.textContent = r.name;
+        opt.textContent = r.nameKey ? t(r.nameKey) : r.id;
         roleSel.appendChild(opt);
       }
       roleSel.value = sel.role || 'X';
       roleSel.addEventListener('change', () => { sel.role = roleSel.value; commit(); });
-      row('Ruolo', roleSel);
+      row(t('inspector.role'), roleSel);
 
       const teamSel = document.createElement('select');
-      for (const t of TEAMS) {
+      for (const team of TEAMS) {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = team.id;
+        opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
         teamSel.appendChild(opt);
       }
       teamSel.value = sel.team || 'A';
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
-      row('Squadra', teamSel);
+      row(t('inspector.team'), teamSel);
 
       const del = document.createElement('button');
       del.className = 'btn btnDanger';
-      del.textContent = 'Elimina';
+      del.textContent = t('inspector.delete');
       del.type = 'button';
       del.addEventListener('click', () => { removeSelected(); });
       inspector.appendChild(del);
@@ -1148,7 +1561,7 @@
         sel.style.color = colorInput.value;
         commit();
       });
-      row('Colore', colorInput);
+      row(t('inspector.color'), colorInput);
 
       const widthInput = document.createElement('input');
       widthInput.type = 'number';
@@ -1161,20 +1574,20 @@
         sel.style.width = String(clamp(Number(widthInput.value) || 0.08, 0.02, 0.3));
         commit();
       });
-      row('Spessore', widthInput);
+      row(t('inspector.thickness'), widthInput);
     }
 
     if (type === 'arrow') {
       const teamSel = document.createElement('select');
-      for (const t of TEAMS) {
+      for (const team of TEAMS) {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = team.id;
+        opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
         teamSel.appendChild(opt);
       }
       teamSel.value = sel.team || 'A';
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
-      row('Squadra', teamSel);
+      row(t('inspector.team'), teamSel);
 
       const opacity = document.createElement('input');
       opacity.type = 'number';
@@ -1187,11 +1600,11 @@
         sel.style.opacity = String(clamp(Number(opacity.value)||0.9, 0.1, 1));
         commit();
       });
-      row('Opacità', opacity);
+      row(t('inspector.opacity'), opacity);
 
       const del = document.createElement('button');
       del.className = 'btn btnDanger';
-      del.textContent = 'Elimina';
+      del.textContent = t('inspector.delete');
       del.type = 'button';
       del.addEventListener('click', () => { removeSelected(); });
       inspector.appendChild(del);
@@ -1200,7 +1613,7 @@
     if (type === 'freehand' || type === 'rect' || type === 'circle') {
       const del = document.createElement('button');
       del.className = 'btn btnDanger';
-      del.textContent = 'Elimina';
+      del.textContent = t('inspector.delete');
       del.type = 'button';
       del.addEventListener('click', () => { removeSelected(); });
       inspector.appendChild(del);
@@ -1210,7 +1623,7 @@
       const txt = document.createElement('input');
       txt.value = sel.text || '';
       txt.addEventListener('input', () => { sel.text = txt.value; commit(); });
-      row('Testo', txt);
+      row(t('inspector.text'), txt);
 
       const size = document.createElement('input');
       size.type = 'number';
@@ -1223,22 +1636,22 @@
         sel.style.size = String(clamp(Number(size.value)||0.55, 0.2, 1.2));
         commit();
       });
-      row('Dimensione', size);
+      row(t('inspector.size'), size);
 
       const teamSel = document.createElement('select');
-      for (const t of TEAMS) {
+      for (const team of TEAMS) {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = team.id;
+        opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
         teamSel.appendChild(opt);
       }
       teamSel.value = sel.team || 'A';
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
-      row('Squadra', teamSel);
+      row(t('inspector.team'), teamSel);
 
       const del = document.createElement('button');
       del.className = 'btn btnDanger';
-      del.textContent = 'Elimina';
+      del.textContent = t('inspector.delete');
       del.type = 'button';
       del.addEventListener('click', () => { removeSelected(); });
       inspector.appendChild(del);
@@ -1247,7 +1660,7 @@
     if (type === 'ball') {
       const vis = document.createElement('button');
       vis.className = 'btn';
-      vis.textContent = state.ball.visible ? 'Nascondi palla' : 'Mostra palla';
+      vis.textContent = state.ball.visible ? t('inspector.hideBall') : t('inspector.showBall');
       vis.type = 'button';
       vis.addEventListener('click', () => { state.ball.visible = !state.ball.visible; commit(); });
       inspector.appendChild(vis);
@@ -1278,13 +1691,13 @@
   function renderCourtSelectionHint() {
     // mode chip
     const m = state.mode || MODE.SELECT;
-    const label = m === MODE.SELECT ? 'Selezione'
-      : (m === MODE.ARROW ? 'Frecce'
-      : (m === MODE.TEXT ? 'Testo'
-      : (m === MODE.FREEHAND ? 'Libera'
-      : (m === MODE.RECT ? 'Rettangolo'
-      : (m === MODE.CIRCLE ? 'Cerchio' : 'Pan')))));
-    chipMode.textContent = `Modalità: ${label}`;
+    const label = m === MODE.SELECT ? t('mode.select')
+      : (m === MODE.ARROW ? t('mode.arrow')
+      : (m === MODE.TEXT ? t('mode.text')
+      : (m === MODE.FREEHAND ? t('mode.freehand')
+      : (m === MODE.RECT ? t('mode.rect')
+      : (m === MODE.CIRCLE ? t('mode.circle') : t('mode.pan'))))));
+    chipMode.textContent = t('mode.label', { label });
   }
 
   function commit() {
@@ -1366,7 +1779,7 @@
     addProp('ball', x, y);
   }
 
-  function addTextAt(x,y, text='Testo', team='A') {
+  function addTextAt(x,y, text=t('default.text'), team='A') {
     state.texts.push({ id: ID(), type:'text', x, y, text, team, style:{ size:'0.55' } });
     commit();
   }
@@ -1401,6 +1814,7 @@
     if (!toolGrid) return;
     toolGrid.innerHTML = '';
     const iconFor = (item) => {
+      const labelText = item.labelKey ? t(item.labelKey) : (item.label || '');
       if (item.kind === 'role') return item.role || 'R';
       if (item.kind === 'player' && item.role === 'NONE') return 'G';
       if (item.kind === 'ball-cart') return 'CP';
@@ -1409,7 +1823,7 @@
       if (item.kind === 'assistant') return 'ASS';
       if (item.kind === 'ladder') return 'SCL';
       if (item.kind === 'target') return 'BRG';
-      return item.label.slice(0, 2).toUpperCase();
+      return labelText.slice(0, 2).toUpperCase();
     };
 
     for (const item of TOOLBOX_ITEMS) {
@@ -1433,7 +1847,7 @@
 
       const label = document.createElement('span');
       label.className = 'toolLabel';
-      label.textContent = item.label;
+      label.textContent = item.labelKey ? t(item.labelKey) : (item.label || '');
 
       b.appendChild(preview);
       b.appendChild(label);
@@ -1806,9 +2220,10 @@
   const btnIOMain = $('#btnIOMain');
 
   function openExport() {
-    dlgTitle.textContent = 'Export JSON';
+    dlgTitle.dataset.i18n = 'export.title';
+    btnIOMain.dataset.i18n = 'export.copy';
+    applyI18n(dlgIO);
     ioText.value = JSON.stringify(serializeState(), null, 2);
-    btnIOMain.textContent = 'Copia';
     btnIOMain.onclick = async (e) => {
       e.preventDefault();
       try { await navigator.clipboard.writeText(ioText.value); } catch {}
@@ -1820,9 +2235,10 @@
   }
 
   function openImport() {
-    dlgTitle.textContent = 'Import JSON';
+    dlgTitle.dataset.i18n = 'import.title';
+    btnIOMain.dataset.i18n = 'import.cta';
+    applyI18n(dlgIO);
     ioText.value = '';
-    btnIOMain.textContent = 'Importa';
     btnIOMain.onclick = (e) => {
       e.preventDefault();
       try {
@@ -1830,7 +2246,7 @@
         applySerializedState(next);
         dlgIO.close();
       } catch (err) {
-        alert('JSON non valido');
+        alert(t('import.invalidJson'));
       }
     };
     dlgIO.showModal();
@@ -1920,7 +2336,7 @@
     for (const item of items) {
       const opt = document.createElement('option');
       opt.value = getValue(item);
-      opt.textContent = item.name;
+      opt.textContent = item.nameKey ? t(item.nameKey) : (item.name || item.id);
       sel.appendChild(opt);
     }
   };
@@ -1962,7 +2378,7 @@
 
     const title = document.createElement('div');
     title.className = 'menuTitle';
-    title.textContent = sel ? 'Modifica' : 'Azioni';
+    title.textContent = sel ? t('menu.title.edit') : t('menu.title.actions');
     ctxMenu.appendChild(title);
 
     const row = (label, inputEl) => {
@@ -1990,17 +2406,17 @@
     };
 
     if (!sel && selIds.length > 1) {
-      addBtn('Elimina selezionati', () => removeSelected(), 'btn btnDanger');
+      addBtn(t('action.deleteSelected'), () => removeSelected(), 'btn btnDanger');
       ctxMenu.appendChild(actions);
       return;
     }
 
     if (!sel) {
-      addBtn('Aggiungi giocatore A', () => addPlayer('A', 4, 4.5, ''), 'btn');
-      addBtn('Aggiungi giocatore B', () => addPlayer('B', 14, 4.5, ''), 'btn');
-      addBtn('Aggiungi testo', () => { setMode(MODE.TEXT); }, 'btn');
-      addBtn('Frecce', () => { setMode(MODE.ARROW); }, 'btn');
-      addBtn('Reset', () => replaceState(DEFAULT_STATE()), 'btn btnDanger');
+      addBtn(t('menu.addPlayerA'), () => addPlayer('A', 4, 4.5, ''), 'btn');
+      addBtn(t('menu.addPlayerB'), () => addPlayer('B', 14, 4.5, ''), 'btn');
+      addBtn(t('menu.addText'), () => { setMode(MODE.TEXT); }, 'btn');
+      addBtn(t('menu.arrows'), () => { setMode(MODE.ARROW); }, 'btn');
+      addBtn(t('menu.reset'), () => replaceState(DEFAULT_STATE()), 'btn btnDanger');
       ctxMenu.appendChild(actions);
       return;
     }
@@ -2009,58 +2425,58 @@
       const overrideInput = document.createElement('input');
       overrideInput.value = sel.overrideText || '';
       overrideInput.addEventListener('input', () => { sel.overrideText = overrideInput.value; commit(); });
-      row('Testo speciale', overrideInput);
+      row(t('inspector.overrideText'), overrideInput);
 
       const labelInput = document.createElement('input');
       labelInput.value = sel.label || '';
       labelInput.addEventListener('input', () => { sel.label = labelInput.value; commit(); });
-      row('Numero', labelInput);
+      row(t('inspector.number'), labelInput);
 
       const roleSel = document.createElement('select');
-      for (const r of ROLES) {
+      for (const role of ROLES) {
         const opt = document.createElement('option');
-        opt.value = r.id;
-        opt.textContent = r.name;
+        opt.value = role.id;
+        opt.textContent = role.nameKey ? t(role.nameKey) : role.id;
         roleSel.appendChild(opt);
       }
       roleSel.value = sel.role || 'X';
       roleSel.addEventListener('change', () => { sel.role = roleSel.value; commit(); });
-      row('Ruolo', roleSel);
+      row(t('inspector.role'), roleSel);
 
       const teamSel = document.createElement('select');
-      for (const t of TEAMS) {
+      for (const team of TEAMS) {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = team.id;
+        opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
         teamSel.appendChild(opt);
       }
       teamSel.value = sel.team || 'A';
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
-      row('Squadra', teamSel);
+      row(t('inspector.team'), teamSel);
 
-      addBtn('Duplica', () => { state.objects.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
-      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
+      addBtn(t('menu.duplicate'), () => { state.objects.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
+      addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'arrow') {
       const teamSel = document.createElement('select');
-      for (const t of TEAMS) {
+      for (const team of TEAMS) {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = team.id;
+        opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
         teamSel.appendChild(opt);
       }
       teamSel.value = sel.team || 'A';
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
-      row('Squadra', teamSel);
+      row(t('inspector.team'), teamSel);
 
       const typeSel = document.createElement('select');
       [
-        { id: 'straight', name: 'Dritta' },
-        { id: 'curve', name: 'Curva' },
-        { id: 'angle', name: 'Angolo' },
-      ].forEach((t) => {
+        { id: 'straight', name: t('menu.arrowType.straight') },
+        { id: 'curve', name: t('menu.arrowType.curve') },
+        { id: 'angle', name: t('menu.arrowType.angle') },
+      ].forEach((optDef) => {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = optDef.id;
+        opt.textContent = optDef.name;
         typeSel.appendChild(opt);
       });
       sel.kind = sel.kind || inferArrowKindFromPath(sel.path);
@@ -2075,17 +2491,17 @@
         sel.path = arrowPathFromPoints(pts, sel.kind);
         commit();
       });
-      row('Tipo freccia', typeSel);
+      row(t('menu.arrowType'), typeSel);
 
       const dashSel = document.createElement('select');
       [
-        { id: 'solid', name: 'Pieno' },
-        { id: 'dash', name: 'Tratteggio' },
-        { id: 'dot', name: 'Puntini' },
-      ].forEach((t) => {
+        { id: 'solid', name: t('menu.stroke.solid') },
+        { id: 'dash', name: t('menu.stroke.dash') },
+        { id: 'dot', name: t('menu.stroke.dot') },
+      ].forEach((optDef) => {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = optDef.id;
+        opt.textContent = optDef.name;
         dashSel.appendChild(opt);
       });
       sel.style = sel.style || {};
@@ -2095,7 +2511,7 @@
         sel.style.dash = dashSel.value;
         commit();
       });
-      row('Tratto', dashSel);
+      row(t('menu.stroke'), dashSel);
 
       const opacity = document.createElement('input');
       opacity.type = 'number';
@@ -2108,14 +2524,14 @@
         sel.style.opacity = String(clamp(Number(opacity.value)||0.9, 0.1, 1));
         commit();
       });
-      row('Opacità', opacity);
+      row(t('inspector.opacity'), opacity);
 
-      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
+      addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'text') {
       const txt = document.createElement('input');
       txt.value = sel.text || '';
       txt.addEventListener('input', () => { sel.text = txt.value; commit(); });
-      row('Testo', txt);
+      row(t('inspector.text'), txt);
 
       const size = document.createElement('input');
       size.type = 'number';
@@ -2128,23 +2544,23 @@
         sel.style.size = String(clamp(Number(size.value)||0.55, 0.2, 1.2));
         commit();
       });
-      row('Dimensione', size);
+      row(t('inspector.size'), size);
 
       const teamSel = document.createElement('select');
-      for (const t of TEAMS) {
+      for (const team of TEAMS) {
         const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
+        opt.value = team.id;
+        opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
         teamSel.appendChild(opt);
       }
       teamSel.value = sel.team || 'A';
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
-      row('Squadra', teamSel);
+      row(t('inspector.team'), teamSel);
 
-      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
+      addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'prop') {
-      addBtn('Duplica', () => { state.props.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
-      addBtn('Elimina', () => removeSelected(), 'btn btnDanger');
+      addBtn(t('menu.duplicate'), () => { state.props.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
+      addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     }
 
     ctxMenu.appendChild(actions);
@@ -2401,7 +2817,7 @@
 
     if (mode === MODE.TEXT) {
       cancelLongPress();
-      addTextAt(pt.x, pt.y, 'Testo', 'A');
+      addTextAt(pt.x, pt.y, t('default.text'), 'A');
       setMode(MODE.SELECT);
       return;
     }
@@ -2838,7 +3254,7 @@
     e.preventDefault();
     const pt = svgPointFromClient(e.clientX, e.clientY);
     if (hitTestTarget(e.target)) return;
-    addTextAt(pt.x, pt.y, 'Testo', 'A');
+    addTextAt(pt.x, pt.y, t('default.text'), 'A');
     setSelection(state.texts[state.texts.length - 1].id);
   });
 
@@ -2926,7 +3342,7 @@
   }
 
   function removePlaceholderTexts() {
-    const isPlaceholder = (t) => (t.text || '') === 'Testo'
+    const isPlaceholder = (t) => DEFAULT_TEXT_PLACEHOLDERS.has((t.text || ''))
       && (t.team || 'A') === 'A'
       && (t.style?.size ?? 0.55) === 0.55;
     let changed = false;
@@ -2944,7 +3360,7 @@
 
   // Selection / delete with long press via menu
   // Auto-load state
-  renderToolbox();
+  initLang();
   const loaded = EMBEDDED ? false : loadLocal();
   if (loaded) {
     resetLayoutRotationsToDefaults();

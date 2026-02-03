@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
@@ -15,57 +15,61 @@
       <span class="title">VolleyBoard</span>
     </div>
     <div class="toolbar">
-      <button id="btnAddPlayer" class="btn" title="Aggiungi giocatore">+ Giocatore</button>
-      <button id="btnArrow" class="btn" title="Disegna frecce">↗ Frecce</button>
-      <button id="btnFreehand" class="btn" title="Disegna a mano libera">✎ Libera</button>
-      <button id="btnRect" class="btn" title="Disegna rettangolo">▭ Rett</button>
-      <button id="btnCircle" class="btn" title="Disegna cerchio">◯ Cerchio</button>
-      <button id="btnSelectMode" class="btn" title="Modalità selezione">↖ Selezione</button>
-      <label class="colorControl" title="Colore disegno">
-        <span>Colore</span>
+      <button id="btnAddPlayer" class="btn" title="Add player" data-i18n-title="toolbar.addPlayer.title" data-i18n="toolbar.addPlayer.text">+ Player</button>
+      <button id="btnArrow" class="btn" title="Draw arrows" data-i18n-title="toolbar.arrow.title" data-i18n="toolbar.arrow.text">↗ Arrows</button>
+      <button id="btnFreehand" class="btn" title="Draw freehand" data-i18n-title="toolbar.freehand.title" data-i18n="toolbar.freehand.text">✎ Free</button>
+      <button id="btnRect" class="btn" title="Draw rectangle" data-i18n-title="toolbar.rect.title" data-i18n="toolbar.rect.text">▭ Rect</button>
+      <button id="btnCircle" class="btn" title="Draw circle" data-i18n-title="toolbar.circle.title" data-i18n="toolbar.circle.text">◯ Circle</button>
+      <button id="btnSelectMode" class="btn" title="Selection mode" data-i18n-title="toolbar.select.title" data-i18n="toolbar.select.text">↖ Select</button>
+      <label class="colorControl" title="Drawing color" data-i18n-title="toolbar.color.title">
+        <span data-i18n="toolbar.color.label">Color</span>
         <input id="drawColor" type="color" value="#ffffff" />
       </label>
-      <button id="btnText" class="btn" title="Aggiungi testo">T</button>
-      <button id="btnRotateACW" class="btn" title="Ruota squadra A (orario)">↻ A</button>
-      <button id="btnRotateACCW" class="btn" title="Ruota squadra A (antiorario)">↺ A</button>
-      <button id="btnRotateBCW" class="btn" title="Ruota squadra B (orario)">↻ B</button>
-      <button id="btnRotateBCCW" class="btn" title="Ruota squadra B (antiorario)">↺ B</button>
-      <button id="btnUndo" class="btn" title="Annulla">↶</button>
-      <button id="btnRedo" class="btn" title="Ripristina">↷</button>
-      <button id="btnReset" class="btn btnDanger" title="Reset">Reset</button>
-      <button id="btnExportImg" class="btn" title="Esporta immagine PNG">Immagine</button>
-      <button id="btnExport" class="btn" title="Esporta JSON">Export</button>
-      <button id="btnImport" class="btn" title="Importa JSON">Import</button>
+      <button id="btnText" class="btn" title="Add text" data-i18n-title="toolbar.text.title">T</button>
+      <button id="btnRotateACW" class="btn" title="Rotate team A (clockwise)" data-i18n-title="toolbar.rotateACW.title">↻ A</button>
+      <button id="btnRotateACCW" class="btn" title="Rotate team A (counterclockwise)" data-i18n-title="toolbar.rotateACCW.title">↺ A</button>
+      <button id="btnRotateBCW" class="btn" title="Rotate team B (clockwise)" data-i18n-title="toolbar.rotateBCW.title">↻ B</button>
+      <button id="btnRotateBCCW" class="btn" title="Rotate team B (counterclockwise)" data-i18n-title="toolbar.rotateBCCW.title">↺ B</button>
+      <button id="btnUndo" class="btn" title="Undo" data-i18n-title="toolbar.undo.title">↶</button>
+      <button id="btnRedo" class="btn" title="Redo" data-i18n-title="toolbar.redo.title">↷</button>
+      <button id="btnReset" class="btn btnDanger" title="Reset" data-i18n-title="toolbar.reset.title" data-i18n="toolbar.reset.text">Reset</button>
+      <button id="btnExportImg" class="btn" title="Export PNG image" data-i18n-title="toolbar.exportImg.title" data-i18n="toolbar.exportImg.text">Image</button>
+      <button id="btnExport" class="btn" title="Export JSON" data-i18n-title="toolbar.export.title" data-i18n="toolbar.export.text">Export</button>
+      <button id="btnImport" class="btn" title="Import JSON" data-i18n-title="toolbar.import.title" data-i18n="toolbar.import.text">Import</button>
+      <label class="langControl" title="Language" data-i18n-title="ui.language">
+        <span data-i18n="ui.language">Language</span>
+        <select id="langSelect" aria-label="Language" data-i18n-aria-label="ui.language"></select>
+      </label>
     </div>
   </header>
 
   <main class="main">
     <aside class="toolbox">
       <div class="panel toolboxPanel">
-        <div class="panelTitle">Strumenti</div>
+        <div class="panelTitle" data-i18n="toolbox.title">Tools</div>
         <div class="toolGrid" id="toolGrid"></div>
       </div>
     </aside>
     <section class="stageWrap">
       <div class="layoutTabs" id="layoutTabs" role="tablist">
-        <button class="tab isActive" data-layout="full-h" role="tab">Campo intero</button>
-        <button class="tab" data-layout="half" role="tab">Mezzo campo</button>
+        <button class="tab isActive" data-layout="full-h" role="tab" data-i18n="layout.full">Full court</button>
+        <button class="tab" data-layout="half" role="tab" data-i18n="layout.half">Half court</button>
       </div>
       <div class="stage" id="stage"></div>
-      <button class="rotateBtn rotateLeft" id="btnRotateLeft" type="button" title="Ruota sinistra">↺</button>
-      <button class="rotateBtn rotateRight" id="btnRotateRight" type="button" title="Ruota destra">↻</button>
+      <button class="rotateBtn rotateLeft" id="btnRotateLeft" type="button" title="Rotate left" data-i18n-title="rotate.left.title">↺</button>
+      <button class="rotateBtn rotateRight" id="btnRotateRight" type="button" title="Rotate right" data-i18n-title="rotate.right.title">↻</button>
       <div class="inspectorOverlay" id="inspectorOverlay">
-        <div class="overlayHeader" id="inspectorHandle">Oggetto selezionato</div>
+        <div class="overlayHeader" id="inspectorHandle" data-i18n="inspector.header">Selected object</div>
         <div id="inspector" class="inspector">
-          <div class="muted">Nessuna selezione</div>
+          <div class="muted" data-i18n="inspector.none">No selection</div>
         </div>
       </div>
       <div class="hud" id="hud">
         <div class="hudRow">
-          <span class="chip" id="chipMode">Modalità: Selezione</span>
+          <span class="chip" id="chipMode">Mode: Select</span>
         </div>
         <div class="hudRow">
-          <span class="hint">Drag: sposta oggetti • Space+drag: pan • Tap lungo: menu</span>
+          <span class="hint" data-i18n="hud.hint">Drag: move objects • Space+drag: pan • Long press: menu</span>
         </div>
       </div>
       <div class="ctxMenu" id="ctxMenu" hidden></div>
@@ -73,39 +77,39 @@
 
     <aside class="side">
       <div class="panel">
-        <div class="panelTitle">Aggiungi giocatore per ruolo</div>
+        <div class="panelTitle" data-i18n="panel.addRole.title">Add player by role</div>
         <div class="formGrid">
-          <div class="label">Squadra</div>
+          <div class="label" data-i18n="label.team">Team</div>
           <select id="addTeam"></select>
-          <div class="label">Ruolo</div>
+          <div class="label" data-i18n="label.role">Role</div>
           <select id="addRole"></select>
-          <div class="label">Numero</div>
-          <input id="addNumber" type="text" placeholder="Es. 7" />
-          <button id="btnAddRolePlayer" class="btn btnPrimary full">Aggiungi</button>
+          <div class="label" data-i18n="label.number">Number</div>
+          <input id="addNumber" type="text" placeholder="e.g. 7" data-i18n-placeholder="placeholder.number" />
+          <button id="btnAddRolePlayer" class="btn btnPrimary full" data-i18n="action.add">Add</button>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panelTitle">Squadre di default</div>
+        <div class="panelTitle" data-i18n="panel.presets.title">Default teams</div>
         <div class="presetGrid">
-          <button class="btn" data-preset="teamA">Solo squadra A</button>
-          <button class="btn" data-preset="teamB">Solo squadra B</button>
-          <button class="btn" data-preset="teams">A + B (6 vs 6)</button>
-          <button class="btn" data-preset="empty">Campo vuoto</button>
+          <button class="btn" data-preset="teamA" data-i18n="preset.teamA">Team A only</button>
+          <button class="btn" data-preset="teamB" data-i18n="preset.teamB">Team B only</button>
+          <button class="btn" data-preset="teams" data-i18n="preset.teams">A + B (6 vs 6)</button>
+          <button class="btn" data-preset="empty" data-i18n="preset.empty">Empty court</button>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panelTitle">Note</div>
-        <textarea id="notes" class="notes" placeholder="Annotazioni libere (salvate nello stato)..."></textarea>
+        <div class="panelTitle" data-i18n="panel.notes.title">Notes</div>
+        <textarea id="notes" class="notes" placeholder="Free notes (saved in state)..." data-i18n-placeholder="placeholder.notes"></textarea>
       </div>
 
       <div class="panel">
-        <div class="panelTitle">Stato</div>
+        <div class="panelTitle" data-i18n="panel.state.title">State</div>
         <div class="kv">
-          <div class="k">Oggetti</div><div class="v" id="statObjects">0</div>
-          <div class="k">Layer</div><div class="v">Giocatori • Palla • Disegni • Testo</div>
-          <div class="k">Formato</div><div class="v">SVG + JSON</div>
+          <div class="k" data-i18n="state.objects">Objects</div><div class="v" id="statObjects">0</div>
+          <div class="k" data-i18n="state.layers">Layers</div><div class="v" data-i18n="state.layers.value">Players • Ball • Drawings • Text</div>
+          <div class="k" data-i18n="state.format">Format</div><div class="v" data-i18n="state.format.value">SVG + JSON</div>
         </div>
       </div>
     </aside>
@@ -113,21 +117,21 @@
 
   <dialog id="dlgIO" class="dlg">
     <form method="dialog" class="dlgForm">
-      <div class="dlgTitle" id="dlgTitle">Import/Export</div>
+      <div class="dlgTitle" id="dlgTitle" data-i18n="dialog.io.title">Import/Export</div>
       <textarea id="ioText" class="ioText" spellcheck="false"></textarea>
       <div class="dlgActions">
-        <button value="cancel" class="btn">Chiudi</button>
-        <button id="btnIOMain" value="ok" class="btn btnPrimary">OK</button>
+        <button value="cancel" class="btn" data-i18n="dialog.close">Close</button>
+        <button id="btnIOMain" value="ok" class="btn btnPrimary" data-i18n="dialog.ok">OK</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="dlgMenu" class="dlg">
     <form method="dialog" class="dlgForm small">
-      <div class="dlgTitle">Azioni</div>
+      <div class="dlgTitle" data-i18n="dialog.menu.title">Actions</div>
       <div class="menuGrid" id="menuGrid"></div>
       <div class="dlgActions">
-        <button value="cancel" class="btn">Chiudi</button>
+        <button value="cancel" class="btn" data-i18n="dialog.close">Close</button>
       </div>
     </form>
   </dialog>
