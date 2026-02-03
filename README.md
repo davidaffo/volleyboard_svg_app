@@ -1,9 +1,9 @@
 # VolleyBoard SVG
 Web app + plugin Obsidian per lavagna tattica di pallavolo in SVG (responsive desktop/mobile).
 ## Web app
-Apri `web/index.html` con un server statico.
+Apri `docs/index.html` con un server statico.
 Esempio (Arch):
-python -m http.server 8080 -d web
+python -m http.server 8080 -d docs
 Poi apri http://localhost:8080
 ## Obsidian plugin
 1) Copia la cartella `obsidian-plugin/volleyboard-svg` dentro `.obsidian/plugins/` del vault

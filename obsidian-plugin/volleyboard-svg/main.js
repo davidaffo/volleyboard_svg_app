@@ -1,6 +1,6 @@
 /*
   AUTO-GENERATED FILE
-  Source of truth: web/index.html, web/style.css, web/app.js
+  Source of truth: docs/index.html, docs/style.css, docs/app.js
   Regenerate with: node scripts/sync-plugin.js
 */
 const { Plugin, Notice } = require('obsidian');
