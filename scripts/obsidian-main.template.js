@@ -59,7 +59,7 @@ class VolleyBoardPlugin extends Plugin {
       const style = document.createElement('style');
       style.textContent = `
         .vb-obsidian-wrapper{display:block;}
-        .vb-snapshot{display:inline-block;line-height:0;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.35);width:340px;max-width:100%;}
+        .vb-snapshot{display:inline-block;line-height:0;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.35);width:520px;max-width:100%;}
         .vb-snapshot svg{display:block;width:100% !important;height:auto !important;max-width:100% !important;}
         .vb-notes{margin-top:8px;font-size:12px;color:rgba(255,255,255,.7);white-space:pre-wrap;}
         .vb-error{color:rgba(255,255,255,.75);padding:8px;}
