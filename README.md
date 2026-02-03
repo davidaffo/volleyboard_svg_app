@@ -1,23 +1,17 @@
-# VolleyBoard SVG
-Web app + plugin Obsidian per lavagna tattica di pallavolo in SVG (responsive desktop/mobile).
-## Web app
-Apri `docs/index.html` con un server statico.
-Esempio (Arch):
-python -m http.server 8080 -d docs
-Poi apri http://localhost:8080
-## Obsidian plugin
-1) Copia la cartella `obsidian-plugin/volleyboard-svg` dentro `.obsidian/plugins/` del vault
-2) Abilita il plugin da Settings → Community plugins
-3) Inserisci un blocco:
+# VolleyBoard SVG (Obsidian Plugin)
+VolleyBoard is a tactical volleyball whiteboard for Obsidian.
+
+## Obsidian Usage
+1. Enable "VolleyBoard" in Settings → Community plugins.
+2. Insert a block in any note:
 ```volleyboard
 { ...json... }
 ```
-Oppure usa il comando: "Insert VolleyBoard block"
-Nota: il plugin salva il JSON aggiornando il primo blocco ```volleyboard nel file.
-## Gesture
-Drag: sposta oggetti
-Alt+wheel: zoom
-Space+drag: pan
-Modalità Frecce: disegna traiettorie
-Modalità Testo: tap/click per inserire testo
-Delete/Backspace: elimina selezione
+3. Or use the command: `Insert VolleyBoard block`.
+4. Click the board to open the editor, make your changes, then use `Save and close`.
+
+Changes are saved back to the same block you opened.
+
+## Web App
+VolleyBoard is also available as a web app.  
+Open `docs/index.html` with a static server (for example: `python -m http.server 8080 -d docs`).
