@@ -6,7 +6,7 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const webDir = path.join(root, 'docs');
-const pluginDir = path.join(root, 'obsidian-plugin', 'volleyboard-svg');
+const pluginDir = root;
 const templatePath = path.join(root, 'scripts', 'obsidian-main.template.js');
 
 const html = fs.readFileSync(path.join(webDir, 'index.html'), 'utf8');
@@ -43,4 +43,4 @@ const filled = template
 
 fs.writeFileSync(path.join(pluginDir, 'main.js'), filled, 'utf8');
 
-console.log('obsidian-plugin/volleyboard-svg/main.js updated');
+console.log('main.js updated');

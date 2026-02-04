@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 set -eu
 
-SRC_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/../obsidian-plugin/volleyboard-svg" && pwd)"
+SRC_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 
 
-DEST_DIR="~/Coding/volleyboard_svg_app/obsidian-plugin/"
+DEST_DIR="~/Coding/volleyboard_svg_app/"
 
 mkdir -p "$DEST_DIR"
 
