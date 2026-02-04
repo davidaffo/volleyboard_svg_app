@@ -1795,6 +1795,62 @@
     commit();
   }
 
+  function duplicateSelection(ids, opts = {}) {
+    const { dx = 0.6, dy = 0.6 } = opts;
+    if (!ids.length) return;
+    const newIds = [];
+    for (const id of ids) {
+      const obj = objById(id);
+      if (!obj) continue;
+      if (obj.type === 'player') {
+        const copy = { ...obj, id: ID(), x: obj.x + dx, y: obj.y + dy };
+        state.objects.push(copy);
+        newIds.push(copy.id);
+        continue;
+      }
+      if (obj.type === 'text') {
+        const copy = { ...obj, id: ID(), x: obj.x + dx, y: obj.y + dy };
+        state.texts.push(copy);
+        newIds.push(copy.id);
+        continue;
+      }
+      if (obj.type === 'prop') {
+        const copy = { ...obj, id: ID(), x: obj.x + dx, y: obj.y + dy };
+        state.props.push(copy);
+        newIds.push(copy.id);
+        continue;
+      }
+      if (obj.type === 'arrow') {
+        const points = ensureArrowPoints(obj);
+        const nextPoints = {
+          start: { x: points.start.x + dx, y: points.start.y + dy },
+          mid: { x: points.mid.x + dx, y: points.mid.y + dy },
+          end: { x: points.end.x + dx, y: points.end.y + dy },
+        };
+        const kind = obj.kind || 'straight';
+        const copy = {
+          ...obj,
+          id: ID(),
+          points: nextPoints,
+          path: arrowPathFromPoints(nextPoints, kind),
+        };
+        state.drawings.push(copy);
+        newIds.push(copy.id);
+        continue;
+      }
+      if (obj.type === 'freehand' || obj.type === 'rect' || obj.type === 'circle') {
+        const copy = { ...obj, id: ID() };
+        state.drawings.push(copy);
+        newIds.push(copy.id);
+        continue;
+      }
+    }
+    if (newIds.length) {
+      setSelection(newIds);
+      commit();
+    }
+  }
+
   function addProp(kind, x, y, opts = {}) {
     const bounds = currentCourtBounds();
     const clampedX = clamp(x, bounds.minX ?? 0, bounds.maxX);
@@ -2406,6 +2462,26 @@
     };
 
     if (!sel && selIds.length > 1) {
+      const selectedObjs = selIds.map((id) => objById(id)).filter(Boolean);
+      const allPlayers = selectedObjs.length && selectedObjs.every((o) => o.type === 'player');
+      if (allPlayers) {
+        const teamSel = document.createElement('select');
+        for (const team of TEAMS) {
+          const opt = document.createElement('option');
+          opt.value = team.id;
+          opt.textContent = team.nameKey ? t(team.nameKey) : team.id;
+          teamSel.appendChild(opt);
+        }
+        const firstTeam = selectedObjs[0]?.team || 'A';
+        const sameTeam = selectedObjs.every((o) => o.team === firstTeam);
+        teamSel.value = sameTeam ? firstTeam : 'A';
+        teamSel.addEventListener('change', () => {
+          for (const o of selectedObjs) o.team = teamSel.value;
+          commit();
+        });
+        row(t('inspector.team'), teamSel);
+      }
+      addBtn(t('menu.duplicate'), () => duplicateSelection(selIds), 'btn');
       addBtn(t('action.deleteSelected'), () => removeSelected(), 'btn btnDanger');
       ctxMenu.appendChild(actions);
       return;
@@ -2454,7 +2530,7 @@
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
       row(t('inspector.team'), teamSel);
 
-      addBtn(t('menu.duplicate'), () => { state.objects.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
+      addBtn(t('menu.duplicate'), () => duplicateSelection([sel.id]), 'btn');
       addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'arrow') {
       const teamSel = document.createElement('select');
@@ -2526,6 +2602,7 @@
       });
       row(t('inspector.opacity'), opacity);
 
+      addBtn(t('menu.duplicate'), () => duplicateSelection([sel.id]), 'btn');
       addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'text') {
       const txt = document.createElement('input');
@@ -2557,9 +2634,13 @@
       teamSel.addEventListener('change', () => { sel.team = teamSel.value; commit(); });
       row(t('inspector.team'), teamSel);
 
+      addBtn(t('menu.duplicate'), () => duplicateSelection([sel.id]), 'btn');
       addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     } else if (sel.type === 'prop') {
-      addBtn(t('menu.duplicate'), () => { state.props.push({ ...sel, id: ID(), x: sel.x+0.6, y: sel.y+0.6 }); commit(); }, 'btn');
+      addBtn(t('menu.duplicate'), () => duplicateSelection([sel.id]), 'btn');
+      addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
+    } else if (sel.type === 'freehand' || sel.type === 'rect' || sel.type === 'circle') {
+      addBtn(t('menu.duplicate'), () => duplicateSelection([sel.id]), 'btn');
       addBtn(t('menu.delete'), () => removeSelected(), 'btn btnDanger');
     }
 
