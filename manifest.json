@@ -1,7 +1,7 @@
 {
   "id": "volleyboard-svg",
   "name": "VolleyBoard SVG",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minAppVersion": "1.4.0",
   "description": "Tactical volleyball whiteboard with SVG + JSON, built for interactive drills and diagrams.",
   "author": "Davide Daffonchio",
