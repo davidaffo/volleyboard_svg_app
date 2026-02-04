@@ -9,48 +9,48 @@
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="dot"></span>
-      <span class="title">VolleyBoard</span>
-    </div>
-    <div class="toolbar">
-      <button id="btnAddPlayer" class="btn" title="Add player" data-i18n-title="toolbar.addPlayer.title" data-i18n="toolbar.addPlayer.text">+ Player</button>
-      <button id="btnArrow" class="btn" title="Draw arrows" data-i18n-title="toolbar.arrow.title" data-i18n="toolbar.arrow.text">↗ Arrows</button>
-      <button id="btnFreehand" class="btn" title="Draw freehand" data-i18n-title="toolbar.freehand.title" data-i18n="toolbar.freehand.text">✎ Free</button>
-      <button id="btnRect" class="btn" title="Draw rectangle" data-i18n-title="toolbar.rect.title" data-i18n="toolbar.rect.text">▭ Rect</button>
-      <button id="btnCircle" class="btn" title="Draw circle" data-i18n-title="toolbar.circle.title" data-i18n="toolbar.circle.text">◯ Circle</button>
-      <button id="btnSelectMode" class="btn" title="Selection mode" data-i18n-title="toolbar.select.title" data-i18n="toolbar.select.text">↖ Select</button>
-      <label class="colorControl" title="Drawing color" data-i18n-title="toolbar.color.title">
-        <span data-i18n="toolbar.color.label">Color</span>
-        <input id="drawColor" type="color" value="#ffffff" />
-      </label>
-      <button id="btnText" class="btn" title="Add text" data-i18n-title="toolbar.text.title">T</button>
-      <button id="btnRotateACW" class="btn" title="Rotate team A (clockwise)" data-i18n-title="toolbar.rotateACW.title">↻ A</button>
-      <button id="btnRotateACCW" class="btn" title="Rotate team A (counterclockwise)" data-i18n-title="toolbar.rotateACCW.title">↺ A</button>
-      <button id="btnRotateBCW" class="btn" title="Rotate team B (clockwise)" data-i18n-title="toolbar.rotateBCW.title">↻ B</button>
-      <button id="btnRotateBCCW" class="btn" title="Rotate team B (counterclockwise)" data-i18n-title="toolbar.rotateBCCW.title">↺ B</button>
-      <button id="btnUndo" class="btn" title="Undo" data-i18n-title="toolbar.undo.title">↶</button>
-      <button id="btnRedo" class="btn" title="Redo" data-i18n-title="toolbar.redo.title">↷</button>
-      <button id="btnReset" class="btn btnDanger" title="Reset" data-i18n-title="toolbar.reset.title" data-i18n="toolbar.reset.text">Reset</button>
-      <button id="btnExportImg" class="btn" title="Export PNG image" data-i18n-title="toolbar.exportImg.title" data-i18n="toolbar.exportImg.text">Image</button>
-      <button id="btnExport" class="btn" title="Export JSON" data-i18n-title="toolbar.export.title" data-i18n="toolbar.export.text">Export</button>
-      <button id="btnImport" class="btn" title="Import JSON" data-i18n-title="toolbar.import.title" data-i18n="toolbar.import.text">Import</button>
-      <label class="langControl" title="Language" data-i18n-title="ui.language">
-        <span data-i18n="ui.language">Language</span>
-        <select id="langSelect" aria-label="Language" data-i18n-aria-label="ui.language"></select>
-      </label>
-    </div>
-  </header>
-
   <main class="main">
     <aside class="toolbox">
       <div class="panel toolboxPanel">
         <div class="panelTitle" data-i18n="toolbox.title">Tools</div>
+        <div class="toolTeamToggle" id="toolTeamToggle" role="group" aria-label="Toolbox team">
+          <span class="toolTeamLabel" data-i18n="toolbox.team">Team</span>
+          <button class="tab tabSmall isActive" type="button" data-team="A" data-i18n="toolbox.team.A">Team A</button>
+          <button class="tab tabSmall" type="button" data-team="B" data-i18n="toolbox.team.B">Team B</button>
+        </div>
         <div class="toolGrid" id="toolGrid"></div>
       </div>
     </aside>
     <section class="stageWrap">
+      <div class="toolbarRow">
+        <div class="toolbar">
+          <button id="btnAddPlayer" class="btn" title="Add player" data-i18n-title="toolbar.addPlayer.title" data-i18n="toolbar.addPlayer.text">+ Player</button>
+          <button id="btnArrow" class="btn" title="Draw arrows" data-i18n-title="toolbar.arrow.title" data-i18n="toolbar.arrow.text">↗ Arrows</button>
+          <button id="btnFreehand" class="btn" title="Draw freehand" data-i18n-title="toolbar.freehand.title" data-i18n="toolbar.freehand.text">✎ Free</button>
+          <button id="btnRect" class="btn" title="Draw rectangle" data-i18n-title="toolbar.rect.title" data-i18n="toolbar.rect.text">▭ Rect</button>
+          <button id="btnCircle" class="btn" title="Draw circle" data-i18n-title="toolbar.circle.title" data-i18n="toolbar.circle.text">◯ Circle</button>
+          <button id="btnSelectMode" class="btn" title="Selection mode" data-i18n-title="toolbar.select.title" data-i18n="toolbar.select.text">↖ Select</button>
+          <label class="colorControl" title="Drawing color" data-i18n-title="toolbar.color.title">
+            <span data-i18n="toolbar.color.label">Color</span>
+            <input id="drawColor" type="color" value="#ffffff" />
+          </label>
+          <button id="btnText" class="btn" title="Add text" data-i18n-title="toolbar.text.title">T</button>
+          <button id="btnRotateACW" class="btn" title="Rotate team A (clockwise)" data-i18n-title="toolbar.rotateACW.title">↻ A</button>
+          <button id="btnRotateACCW" class="btn" title="Rotate team A (counterclockwise)" data-i18n-title="toolbar.rotateACCW.title">↺ A</button>
+          <button id="btnRotateBCW" class="btn" title="Rotate team B (clockwise)" data-i18n-title="toolbar.rotateBCW.title">↻ B</button>
+          <button id="btnRotateBCCW" class="btn" title="Rotate team B (counterclockwise)" data-i18n-title="toolbar.rotateBCCW.title">↺ B</button>
+          <button id="btnUndo" class="btn" title="Undo" data-i18n-title="toolbar.undo.title">↶</button>
+          <button id="btnRedo" class="btn" title="Redo" data-i18n-title="toolbar.redo.title">↷</button>
+          <button id="btnReset" class="btn btnDanger" title="Reset" data-i18n-title="toolbar.reset.title" data-i18n="toolbar.reset.text">Reset</button>
+          <button id="btnExportImg" class="btn" title="Export PNG image" data-i18n-title="toolbar.exportImg.title" data-i18n="toolbar.exportImg.text">Image</button>
+          <button id="btnExport" class="btn" title="Export JSON" data-i18n-title="toolbar.export.title" data-i18n="toolbar.export.text">Export</button>
+          <button id="btnImport" class="btn" title="Import JSON" data-i18n-title="toolbar.import.title" data-i18n="toolbar.import.text">Import</button>
+          <label class="langControl" title="Language" data-i18n-title="ui.language">
+            <span data-i18n="ui.language">Language</span>
+            <select id="langSelect" aria-label="Language" data-i18n-aria-label="ui.language"></select>
+          </label>
+        </div>
+      </div>
       <div class="layoutTabs" id="layoutTabs" role="tablist">
         <button class="tab isActive" data-layout="full-h" role="tab" data-i18n="layout.full">Full court</button>
         <button class="tab" data-layout="half" role="tab" data-i18n="layout.half">Half court</button>

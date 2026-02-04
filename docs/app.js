@@ -46,6 +46,9 @@
       'toolbar.import.title': 'Import JSON',
       'toolbar.import.text': 'Import',
       'toolbox.title': 'Tools',
+      'toolbox.team': 'Team',
+      'toolbox.team.A': 'Team A',
+      'toolbox.team.B': 'Team B',
       'layout.full': 'Full court',
       'layout.fullVertical': 'Full court (vert.)',
       'layout.half': 'Half court',
@@ -199,6 +202,9 @@
       'toolbar.import.title': 'Importa JSON',
       'toolbar.import.text': 'Import',
       'toolbox.title': 'Strumenti',
+      'toolbox.team': 'Squadra',
+      'toolbox.team.A': 'Squadra A',
+      'toolbox.team.B': 'Squadra B',
       'layout.full': 'Campo intero',
       'layout.fullVertical': 'Campo intero (vert.)',
       'layout.half': 'Mezzo campo',
@@ -462,9 +468,12 @@
   const statObjects = $('#statObjects');
   const chipMode = $('#chipMode');
   const toolGrid = $('#toolGrid');
+  const toolTeamToggle = $('#toolTeamToggle');
   const drawColorInput = $('#drawColor');
   const langSelect = $('#langSelect');
   const ENABLE_LONG_PRESS_MENU = false;
+
+  let toolboxTeam = 'A';
 
   function applyI18n(root=document) {
     $$('[data-i18n]', root).forEach((el) => {
@@ -546,6 +555,20 @@
       langSelect.addEventListener('change', () => setLang(langSelect.value));
     }
     setLang(initial, { persist: false });
+  }
+
+  function setToolboxTeam(next) {
+    toolboxTeam = next === 'B' ? 'B' : 'A';
+    if (!toolTeamToggle) return;
+    $$('.toolTeamToggle .tab', toolTeamToggle).forEach((btn) => {
+      const team = btn.getAttribute('data-team');
+      btn.classList.toggle('isActive', team === toolboxTeam);
+    });
+    if (state.draw) {
+      state.draw.color = teamColor(toolboxTeam);
+      if (drawColorInput) drawColorInput.value = state.draw.color;
+    }
+    renderToolbox();
   }
 
   // Build SVG
@@ -978,7 +1001,8 @@
     };
 
     if (p.kind === 'player') {
-      add('circle', { cx:0, cy:0, r:0.38, fill:'rgba(30,58,138,0.95)', stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
+      const team = p.team || 'A';
+      add('circle', { cx:0, cy:0, r:0.38, fill:teamColor(team), stroke:'rgba(0,0,0,0.25)', 'stroke-width':0.03 });
       add('circle', { cx:-0.12, cy:-0.12, r:0.06, fill:'rgba(255,255,255,0.25)' });
     } else if (p.kind === 'role') {
       add('rect', { x:-0.5, y:-0.25, width:1.0, height:0.5, rx:0.12, fill:'rgba(12,16,22,0.75)', stroke:'rgba(255,255,255,0.2)', 'stroke-width':0.04 });
@@ -1859,9 +1883,9 @@
     commit();
   }
 
-  function addPlayerFromTool(role, x, y) {
+  function addPlayerFromTool(role, x, y, teamOverride) {
     const sel = primarySelection() ? objById(primarySelection()) : null;
-    const team = (sel && sel.team) ? sel.team : 'A';
+    const team = teamOverride || ((sel && sel.team) ? sel.team : 'A');
     const r = role === 'NONE' ? '' : (role || 'X');
     addPlayer(team, x, y, '', r);
   }
@@ -1896,6 +1920,7 @@
       preview.setAttribute('viewBox', '-1 -1 2 2');
       const g = document.createElementNS(svgNS, 'g');
       const p = { kind: item.kind, role: item.role, color: item.color };
+      if (item.kind === 'player') p.team = toolboxTeam;
       const scale = item.previewScale ?? 1.1;
       g.setAttribute('transform', `scale(${scale})`);
       drawPropShape(g, p);
@@ -1913,7 +1938,7 @@
         const cx = v.x + v.w / 2;
         const cy = v.y + v.h / 2;
         if (item.kind === 'player') {
-          addPlayerFromTool(item.role, cx, cy);
+          addPlayerFromTool(item.role, cx, cy, toolboxTeam);
         } else {
           addProp(item.kind, cx, cy, { role: item.role, color: item.color });
         }
@@ -1921,11 +1946,13 @@
 
       b.addEventListener('dragstart', (e) => {
         e.dataTransfer.effectAllowed = 'copy';
-        e.dataTransfer.setData('application/json', JSON.stringify({
+        const payload = {
           kind: item.kind,
           role: item.role || '',
           color: item.color || '',
-        }));
+        };
+        if (item.kind === 'player') payload.team = toolboxTeam;
+        e.dataTransfer.setData('application/json', JSON.stringify(payload));
       });
 
       toolGrid.appendChild(b);
@@ -2031,7 +2058,7 @@
   }
 
   // Toolbar buttons
-  $('#btnAddPlayer').addEventListener('click', () => {
+  $('#btnAddPlayer')?.addEventListener('click', () => {
     // Add to the side closer to current selection/team if possible
     const sel = primarySelection() ? objById(primarySelection()) : null;
     const team = (sel && sel.team) ? sel.team : 'A';
@@ -2043,36 +2070,36 @@
   });
 
 
-  $('#btnArrow').addEventListener('click', () => {
+  $('#btnArrow')?.addEventListener('click', () => {
     setMode(state.mode === MODE.ARROW ? MODE.SELECT : MODE.ARROW);
   });
 
-  $('#btnFreehand').addEventListener('click', () => {
+  $('#btnFreehand')?.addEventListener('click', () => {
     setMode(state.mode === MODE.FREEHAND ? MODE.SELECT : MODE.FREEHAND);
   });
 
-  $('#btnRect').addEventListener('click', () => {
+  $('#btnRect')?.addEventListener('click', () => {
     setMode(state.mode === MODE.RECT ? MODE.SELECT : MODE.RECT);
   });
 
-  $('#btnCircle').addEventListener('click', () => {
+  $('#btnCircle')?.addEventListener('click', () => {
     setMode(state.mode === MODE.CIRCLE ? MODE.SELECT : MODE.CIRCLE);
   });
 
-  $('#btnText').addEventListener('click', () => {
+  $('#btnText')?.addEventListener('click', () => {
     setMode(state.mode === MODE.TEXT ? MODE.SELECT : MODE.TEXT);
   });
 
-  $('#btnSelectMode').addEventListener('click', () => {
+  $('#btnSelectMode')?.addEventListener('click', () => {
     setMode(MODE.SELECT);
   });
 
-  $('#btnRotateACW').addEventListener('click', () => rotateTeam('A', 'cw'));
-  $('#btnRotateACCW').addEventListener('click', () => rotateTeam('A', 'ccw'));
-  $('#btnRotateBCW').addEventListener('click', () => rotateTeam('B', 'cw'));
-  $('#btnRotateBCCW').addEventListener('click', () => rotateTeam('B', 'ccw'));
-  $('#btnUndo').addEventListener('click', () => { const s = undo(); if (s) replaceState(s); });
-  $('#btnRedo').addEventListener('click', () => { const s = redo(); if (s) replaceState(s); });
+  $('#btnRotateACW')?.addEventListener('click', () => rotateTeam('A', 'cw'));
+  $('#btnRotateACCW')?.addEventListener('click', () => rotateTeam('A', 'ccw'));
+  $('#btnRotateBCW')?.addEventListener('click', () => rotateTeam('B', 'cw'));
+  $('#btnRotateBCCW')?.addEventListener('click', () => rotateTeam('B', 'ccw'));
+  $('#btnUndo')?.addEventListener('click', () => { const s = undo(); if (s) replaceState(s); });
+  $('#btnRedo')?.addEventListener('click', () => { const s = redo(); if (s) replaceState(s); });
 
   function resetCurrentLayout() {
     const layoutId = state.layout;
@@ -2099,7 +2126,7 @@
     commit();
   }
 
-  $('#btnReset').addEventListener('click', () => { resetCurrentLayout(); });
+  $('#btnReset')?.addEventListener('click', () => { resetCurrentLayout(); });
 
   function exportFilename(ext) {
     const d = new Date();
@@ -2309,9 +2336,9 @@
     ioText.focus();
   }
 
-  $('#btnExport').addEventListener('click', () => openExport());
-  $('#btnImport').addEventListener('click', () => openImport());
-  $('#btnExportImg').addEventListener('click', () => exportPng());
+  $('#btnExport')?.addEventListener('click', () => openExport());
+  $('#btnImport')?.addEventListener('click', () => openImport());
+  $('#btnExportImg')?.addEventListener('click', () => exportPng());
 
   // Notes binding
   notesEl.addEventListener('input', () => { state.notes = notesEl.value; commit(); });
@@ -2371,6 +2398,16 @@
     applyLayoutTransform();
     commit();
   });
+
+  if (toolTeamToggle) {
+    $$('.tab', toolTeamToggle).forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const team = btn.getAttribute('data-team') || 'A';
+        setToolboxTeam(team);
+      });
+    });
+    setToolboxTeam('A');
+  }
 
   // Default teams + empty
   $$('.presetGrid .btn').forEach(b => {
@@ -2819,8 +2856,7 @@
 
     if (mode === MODE.ARROW) {
       cancelLongPress();
-      const sel = primarySelection() ? objById(primarySelection()) : null;
-      const team = (sel && sel.team) ? sel.team : 'A';
+      const team = toolboxTeam;
       const color = teamColor(team);
       const width = state.draw?.width ?? 0.08;
       arrowDraft = {
@@ -3298,7 +3334,7 @@
       const data = JSON.parse(raw);
       const pt = svgPointFromClient(e.clientX, e.clientY);
       if (data.kind === 'player') {
-        addPlayerFromTool(data.role, pt.x, pt.y);
+        addPlayerFromTool(data.role, pt.x, pt.y, data.team || null);
       } else {
         addProp(data.kind, pt.x, pt.y, { role: data.role, color: data.color });
       }
