@@ -35,6 +35,10 @@
       'toolbar.rotateACCW.title': 'Rotate team A (counterclockwise)',
       'toolbar.rotateBCW.title': 'Rotate team B (clockwise)',
       'toolbar.rotateBCCW.title': 'Rotate team B (counterclockwise)',
+      'toolbar.mirrorLR.title': 'Mirror left to right',
+      'toolbar.mirrorLR.text': 'Mirror L→R',
+      'toolbar.mirrorRL.title': 'Mirror right to left',
+      'toolbar.mirrorRL.text': 'Mirror R→L',
       'toolbar.undo.title': 'Undo',
       'toolbar.redo.title': 'Redo',
       'toolbar.reset.title': 'Reset',
@@ -191,6 +195,10 @@
       'toolbar.rotateACCW.title': 'Ruota squadra A (antiorario)',
       'toolbar.rotateBCW.title': 'Ruota squadra B (orario)',
       'toolbar.rotateBCCW.title': 'Ruota squadra B (antiorario)',
+      'toolbar.mirrorLR.title': 'Specchia da sinistra a destra',
+      'toolbar.mirrorLR.text': 'Specchia S→D',
+      'toolbar.mirrorRL.title': 'Specchia da destra a sinistra',
+      'toolbar.mirrorRL.text': 'Specchia D→S',
       'toolbar.undo.title': 'Annulla',
       'toolbar.redo.title': 'Ripristina',
       'toolbar.reset.title': 'Reset',
@@ -804,6 +812,166 @@
   function teamColor(teamId) {
     // Use currentColor on elements; we set style color on group/items
     return teamId === 'A' ? 'rgba(30,58,138,0.95)' : 'rgba(153,27,27,0.95)';
+  }
+
+  function oppositeTeam(teamId) {
+    if (teamId === 'A') return 'B';
+    if (teamId === 'B') return 'A';
+    return teamId;
+  }
+
+  function mirrorX(x) {
+    return COURT_W - x;
+  }
+
+  function mirrorY(y) {
+    return COURT_H - y;
+  }
+
+  function sideFromX(x) {
+    if (!Number.isFinite(x)) return null;
+    if (x < COURT_W / 2) return 'left';
+    if (x > COURT_W / 2) return 'right';
+    return null;
+  }
+
+  function formatPathNumber(v) {
+    if (!Number.isFinite(v)) return '0';
+    return Number(v.toFixed(4)).toString();
+  }
+
+  function commandArgCount(cmd) {
+    const c = cmd.toUpperCase();
+    if (c === 'M' || c === 'L' || c === 'T') return 2;
+    if (c === 'H' || c === 'V') return 1;
+    if (c === 'S' || c === 'Q') return 4;
+    if (c === 'C') return 6;
+    if (c === 'A') return 7;
+    return 0;
+  }
+
+  function xIndexesForCommand(cmd) {
+    const c = cmd.toUpperCase();
+    if (c === 'M' || c === 'L' || c === 'T') return [0];
+    if (c === 'H') return [0];
+    if (c === 'S' || c === 'Q') return [0, 2];
+    if (c === 'C') return [0, 2, 4];
+    if (c === 'A') return [5];
+    return [];
+  }
+
+  function yIndexesForCommand(cmd) {
+    const c = cmd.toUpperCase();
+    if (c === 'M' || c === 'L' || c === 'T') return [1];
+    if (c === 'V') return [0];
+    if (c === 'S' || c === 'Q') return [1, 3];
+    if (c === 'C') return [1, 3, 5];
+    if (c === 'A') return [6];
+    return [];
+  }
+
+  function tokenizePath(path) {
+    if (!path || typeof path !== 'string') return [];
+    return path.match(/[a-zA-Z]|-?\d*\.?\d+(?:e[-+]?\d+)?/g) || [];
+  }
+
+  function eachPathChunk(path, onChunk) {
+    const tokens = tokenizePath(path);
+    let i = 0;
+    let cmd = '';
+    while (i < tokens.length) {
+      const tk = tokens[i];
+      if (/^[a-zA-Z]$/.test(tk)) {
+        cmd = tk;
+        i += 1;
+        onChunk(cmd, null);
+        continue;
+      }
+      if (!cmd) {
+        i += 1;
+        continue;
+      }
+      const argc = commandArgCount(cmd);
+      if (!argc) {
+        i += 1;
+        continue;
+      }
+      const nums = [];
+      while (i < tokens.length && !/^[a-zA-Z]$/.test(tokens[i])) {
+        nums.push(Number(tokens[i]));
+        i += 1;
+      }
+      for (let j = 0; j + argc <= nums.length; j += argc) {
+        onChunk(cmd, nums.slice(j, j + argc));
+      }
+    }
+  }
+
+  function mirrorPathXY(path) {
+    const tokens = tokenizePath(path);
+    if (!tokens.length) return path;
+    const out = [];
+    let i = 0;
+    let cmd = '';
+    while (i < tokens.length) {
+      const tk = tokens[i];
+      if (/^[a-zA-Z]$/.test(tk)) {
+        cmd = tk;
+        out.push(cmd);
+        i += 1;
+        continue;
+      }
+      if (!cmd) {
+        out.push(tk);
+        i += 1;
+        continue;
+      }
+      const argc = commandArgCount(cmd);
+      if (!argc) {
+        out.push(tk);
+        i += 1;
+        continue;
+      }
+      const xIdx = xIndexesForCommand(cmd);
+      const yIdx = yIndexesForCommand(cmd);
+      const nums = [];
+      while (i < tokens.length && !/^[a-zA-Z]$/.test(tokens[i])) {
+        nums.push(Number(tokens[i]));
+        i += 1;
+      }
+      let j = 0;
+      while (j + argc <= nums.length) {
+        const chunk = nums.slice(j, j + argc);
+        for (const k of xIdx) {
+          if (k < chunk.length) chunk[k] = mirrorX(chunk[k]);
+        }
+        for (const k of yIdx) {
+          if (k < chunk.length) chunk[k] = mirrorY(chunk[k]);
+        }
+        out.push(...chunk.map(formatPathNumber));
+        j += argc;
+      }
+      if (j < nums.length) out.push(...nums.slice(j).map(formatPathNumber));
+    }
+    return out.join(' ');
+  }
+
+  function pathAnchorX(path) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    eachPathChunk(path, (cmd, chunk) => {
+      if (!chunk) return;
+      const xIdx = xIndexesForCommand(cmd);
+      for (const idx of xIdx) {
+        if (idx >= chunk.length) continue;
+        const x = chunk[idx];
+        if (!Number.isFinite(x)) continue;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+      }
+    });
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX)) return null;
+    return (minX + maxX) / 2;
   }
 
   function currentCourtBounds() {
@@ -2049,6 +2217,94 @@
     commit();
   }
 
+  function mirrorCurrentHalfToOpposite(sourceSide) {
+    const drawingAnchorX = (d) => {
+      if (d.type === 'arrow') {
+        const pts = ensureArrowPoints(d);
+        return pts.start.x;
+      }
+      return pathAnchorX(d.path);
+    };
+
+    if (sourceSide !== 'left' && sourceSide !== 'right') return;
+    const targetSide = sourceSide === 'left' ? 'right' : 'left';
+
+    const inSide = (x, side) => sideFromX(x) === side;
+
+    const sourceObjects = state.objects.filter((o) => inSide(o.x, sourceSide));
+    const sourceTexts = state.texts.filter((t) => inSide(t.x, sourceSide));
+    const sourceProps = state.props.filter((p) => inSide(p.x, sourceSide));
+    const sourceDrawings = state.drawings.filter((d) => inSide(drawingAnchorX(d), sourceSide));
+
+    if (sourceObjects.length) {
+      state.objects = state.objects.filter((o) => !inSide(o.x, targetSide));
+    }
+    if (sourceTexts.length) {
+      state.texts = state.texts.filter((t) => !inSide(t.x, targetSide));
+    }
+    if (sourceProps.length) {
+      state.props = state.props.filter((p) => !inSide(p.x, targetSide));
+    }
+    if (sourceDrawings.length) {
+      state.drawings = state.drawings.filter((d) => !inSide(drawingAnchorX(d), targetSide));
+    }
+
+    for (const o of sourceObjects) {
+      state.objects.push({
+        ...o,
+        id: ID(),
+        team: o.type === 'player' ? oppositeTeam(o.team) : o.team,
+        x: mirrorX(o.x),
+        y: mirrorY(o.y),
+      });
+    }
+    for (const t of sourceTexts) {
+      state.texts.push({
+        ...t,
+        id: ID(),
+        x: mirrorX(t.x),
+        y: mirrorY(t.y),
+      });
+    }
+    for (const p of sourceProps) {
+      state.props.push({
+        ...p,
+        id: ID(),
+        x: mirrorX(p.x),
+        y: mirrorY(p.y),
+      });
+    }
+    for (const d of sourceDrawings) {
+      if (d.type === 'arrow') {
+        const pts = ensureArrowPoints(d);
+        const mirroredPoints = {
+          start: { x: mirrorX(pts.start.x), y: mirrorY(pts.start.y) },
+          mid: { x: mirrorX(pts.mid.x), y: mirrorY(pts.mid.y) },
+          end: { x: mirrorX(pts.end.x), y: mirrorY(pts.end.y) },
+        };
+        const kind = d.kind || inferArrowKindFromPath(d.path);
+        state.drawings.push({
+          ...d,
+          id: ID(),
+          team: oppositeTeam(d.team),
+          points: mirroredPoints,
+          path: arrowPathFromPoints(mirroredPoints, kind),
+          kind,
+        });
+      } else {
+        state.drawings.push({
+          ...d,
+          id: ID(),
+          team: oppositeTeam(d.team),
+          path: mirrorPathXY(d.path),
+        });
+      }
+    }
+
+    state.selection = [];
+    commit();
+  }
+
   // Modes and actions
   state.mode = MODE.SELECT;
 
@@ -2098,6 +2354,8 @@
   $('#btnRotateACCW')?.addEventListener('click', () => rotateTeam('A', 'ccw'));
   $('#btnRotateBCW')?.addEventListener('click', () => rotateTeam('B', 'cw'));
   $('#btnRotateBCCW')?.addEventListener('click', () => rotateTeam('B', 'ccw'));
+  $('#btnMirrorLR')?.addEventListener('click', () => mirrorCurrentHalfToOpposite('left'));
+  $('#btnMirrorRL')?.addEventListener('click', () => mirrorCurrentHalfToOpposite('right'));
   $('#btnUndo')?.addEventListener('click', () => { const s = undo(); if (s) replaceState(s); });
   $('#btnRedo')?.addEventListener('click', () => { const s = redo(); if (s) replaceState(s); });
 
