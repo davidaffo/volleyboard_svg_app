@@ -4,10 +4,25 @@
   Regenerate with: node scripts/sync-plugin.js
 */
 const { Plugin, Notice } = require('obsidian');
+const fs = require('fs');
+const path = require('path');
 
 const WEB_HTML = __WEB_HTML__;
 const WEB_CSS = __WEB_CSS__;
 const WEB_JS = __WEB_JS__;
+const EXCALIFONT_DATA_URI = (() => {
+  try {
+    const fromCss = WEB_CSS.match(/src:\s*url\((['"]?)(data:font\/woff2;base64,[^)"']+)\1\)\s*format\(['"]woff2['"]\)/i);
+    if (fromCss && fromCss[2]) return fromCss[2];
+  } catch {}
+  try {
+    const fontPath = path.join(__dirname, 'assets', 'Excalifont-Regular.woff2');
+    const raw = fs.readFileSync(fontPath);
+    return `data:font/woff2;base64,${raw.toString('base64')}`;
+  } catch {
+    return '';
+  }
+})();
 
 function buildSrcDoc() {
   return [
@@ -51,6 +66,15 @@ function waitForApi(iframe) {
   });
 }
 
+function injectSnapshotFont(svgText) {
+  if (!svgText || !EXCALIFONT_DATA_URI) return svgText;
+  const styleTag = `<style>@font-face{font-family:"Excalifont";src:url("${EXCALIFONT_DATA_URI}") format("woff2");font-weight:400;font-style:normal;font-display:swap;}text,tspan{font-family:"Excalifont","Comic Sans MS","Marker Felt","Bradley Hand","Segoe Print",cursive !important;}</style>`;
+  if (/<defs(\s|>)/i.test(svgText)) {
+    return svgText.replace(/<defs(\s[^>]*)?>/i, (m) => `${m}${styleTag}`);
+  }
+  return svgText.replace(/<svg(\s[^>]*)?>/i, (m) => `${m}<defs>${styleTag}</defs>`);
+}
+
 class VolleyBoardPlugin extends Plugin {
   async onload() {
     this.registerMarkdownCodeBlockProcessor('volleyboard', async (source, el, ctx) => {
@@ -58,9 +82,11 @@ class VolleyBoardPlugin extends Plugin {
       const wrapper = el.createDiv({ cls: 'vb-obsidian-wrapper' });
       const style = document.createElement('style');
       style.textContent = `
+        ${EXCALIFONT_DATA_URI ? `@font-face{font-family:"Excalifont";src:url("${EXCALIFONT_DATA_URI}") format("woff2");font-weight:400;font-style:normal;font-display:swap;}` : ''}
         .vb-obsidian-wrapper{display:block;}
         .vb-snapshot{display:inline-block;line-height:0;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.35);width:520px;max-width:100%;}
         .vb-snapshot svg{display:block;width:100% !important;height:auto !important;max-width:100% !important;}
+        .vb-snapshot text,.vb-snapshot tspan{font-family:"Excalifont","Comic Sans MS","Marker Felt","Bradley Hand","Segoe Print",cursive !important;}
         .vb-notes{margin-top:8px;font-size:12px;color:rgba(255,255,255,.7);white-space:pre-wrap;}
         .vb-error{color:rgba(255,255,255,.75);padding:8px;}
         .vb-editor-frame{width:100%;height:100%;border:0;border-radius:0;}
@@ -106,7 +132,7 @@ class VolleyBoardPlugin extends Plugin {
           snap.textContent = 'VolleyBoard: snapshot non disponibile.';
           return;
         }
-        snap.innerHTML = svg;
+        snap.innerHTML = injectSnapshotFont(svg);
       };
 
       await renderSnapshot();
