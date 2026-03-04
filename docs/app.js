@@ -1052,6 +1052,7 @@
 
       const g = document.createElementNS(svgNS, 'g');
       g.setAttribute('data-id', o.id);
+      g.setAttribute('data-team', o.team || 'A');
       const rot = o.rotation || 0;
       const scale = o.scale || 1;
       g.setAttribute('transform', `translate(${o.x} ${o.y}) rotate(${rot}) scale(${scale})`);
@@ -1062,6 +1063,7 @@
       base.setAttribute('cx', '0');
       base.setAttribute('cy', '0');
       base.setAttribute('r', '0.38');
+      base.setAttribute('class', 'vb-player-base');
       base.setAttribute('fill', 'currentColor');
       base.setAttribute('stroke', 'rgba(0,0,0,0.25)');
       base.setAttribute('stroke-width', '0.03');
@@ -1362,11 +1364,12 @@
     const p2y = by - py * w * 0.5;
     headEl.setAttribute('d', `M ${end.x} ${end.y} L ${p1x} ${p1y} L ${p2x} ${p2y} Z`);
     headEl.setAttribute('fill', color);
+    headEl.setAttribute('data-arrow-head', '1');
   }
 
   function arrowHeadSize(width) {
     const w = Number(width) || 0.08;
-    return Math.max(0.34, w * 4.8);
+    return Math.max(0.1, w * 2.2);
   }
 
   function shortenArrowEnd(points, kind, size) {
@@ -1398,6 +1401,7 @@
       if (d.type === 'arrow') {
         const g = document.createElementNS(svgNS, 'g');
         g.setAttribute('data-id', d.id);
+        g.setAttribute('data-team', d.team || 'A');
         g.style.cursor = 'pointer';
         const points = ensureArrowPoints(d);
         const kind = d.kind || inferArrowKindFromPath(d.path);
@@ -1438,6 +1442,7 @@
       } else {
         const p = document.createElementNS(svgNS, 'path');
         p.setAttribute('data-id', d.id);
+        p.setAttribute('data-team', d.team || 'A');
         p.setAttribute('d', d.path);
         p.setAttribute('fill', 'none');
         p.setAttribute('stroke', 'currentColor');
@@ -1473,6 +1478,7 @@
     for (const t of state.texts) {
       const g = document.createElementNS(svgNS, 'g');
       g.setAttribute('data-id', t.id);
+      g.setAttribute('data-team', t.team || 'A');
       const rot = t.rotation || 0;
       const scale = t.scale || 1;
       g.setAttribute('transform', `translate(${t.x} ${t.y}) rotate(${rot}) scale(${scale})`);

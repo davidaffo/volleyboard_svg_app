@@ -3,7 +3,7 @@
   Source of truth: docs/index.html, docs/style.css, docs/app.js
   Regenerate with: node scripts/sync-plugin.js
 */
-const { Plugin, Notice } = require('obsidian');
+const { Plugin, Notice, Modal } = require('obsidian');
 const fs = require('fs');
 const path = require('path');
 
@@ -73,6 +73,265 @@ function injectSnapshotFont(svgText) {
     return svgText.replace(/<defs(\s[^>]*)?>/i, (m) => `${m}${styleTag}`);
   }
   return svgText.replace(/<svg(\s[^>]*)?>/i, (m) => `${m}<defs>${styleTag}</defs>`);
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function applyLineOnlyToSvg(svgEl) {
+  if (!svgEl) return;
+  const teamTone = (el) => {
+    const t = el?.closest?.('[data-team]')?.getAttribute?.('data-team');
+    return t === 'B' ? '#666' : '#111';
+  };
+  svgEl.querySelectorAll('[fill]').forEach((el) => {
+    if (el.getAttribute('data-arrow-head') === '1') {
+      el.setAttribute('fill', teamTone(el));
+      el.setAttribute('stroke', 'none');
+      return;
+    }
+    if (el.classList?.contains('vb-player-base')) {
+      el.setAttribute('fill', '#fff');
+      el.setAttribute('stroke', teamTone(el));
+      return;
+    }
+    const v = String(el.getAttribute('fill') || '').trim().toLowerCase();
+    if (v && v !== 'none') el.setAttribute('fill', 'none');
+  });
+  svgEl.querySelectorAll('[stroke]').forEach((el) => {
+    el.setAttribute('stroke', teamTone(el));
+  });
+  svgEl.querySelectorAll('text, tspan').forEach((el) => {
+    el.setAttribute('fill', teamTone(el));
+    el.setAttribute('stroke', 'none');
+  });
+}
+
+class VolleyBoardPdfModal extends Modal {
+  constructor(app, items, onSubmit) {
+    super(app);
+    this.items = items.map((item, idx) => ({ ...item, enabled: true, order: idx + 1 }));
+    this.onSubmit = onSubmit;
+    this.dragIndex = null;
+    this.columns = 2;
+    this.gapMm = 6;
+    this.marginMm = 10;
+    this.orientation = 'portrait';
+    this.lineOnly = false;
+    this.fitOnePage = true;
+    this.previewEl = null;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h2', { text: 'Stampa VolleyBoard (A4)' });
+
+    const controls = contentEl.createDiv();
+    controls.style.display = 'grid';
+    controls.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))';
+    controls.style.gap = '8px';
+    controls.style.marginBottom = '12px';
+
+    const columnsWrap = controls.createDiv();
+    columnsWrap.createEl('div', { text: 'Colonne griglia' });
+    const columnsSel = columnsWrap.createEl('select');
+    [1, 2, 3, 4].forEach((n) => {
+      const opt = document.createElement('option');
+      opt.value = String(n);
+      opt.textContent = String(n);
+      if (n === this.columns) opt.selected = true;
+      columnsSel.appendChild(opt);
+    });
+
+    const gapWrap = controls.createDiv();
+    gapWrap.createEl('div', { text: 'Spazio tra board (mm)' });
+    const gapInput = gapWrap.createEl('input');
+    gapInput.type = 'number';
+    gapInput.min = '0';
+    gapInput.max = '30';
+    gapInput.step = '1';
+    gapInput.value = String(this.gapMm);
+
+    const marginWrap = controls.createDiv();
+    marginWrap.createEl('div', { text: 'Margine pagina (mm)' });
+    const marginInput = marginWrap.createEl('input');
+    marginInput.type = 'number';
+    marginInput.min = '0';
+    marginInput.max = '30';
+    marginInput.step = '1';
+    marginInput.value = String(this.marginMm);
+    marginInput.addEventListener('input', () => { this.marginMm = Number(marginInput.value) || 0; });
+
+    const orientWrap = controls.createDiv();
+    orientWrap.createEl('div', { text: 'Orientamento' });
+    const orientSel = orientWrap.createEl('select');
+    [{ v: 'portrait', t: 'Portrait' }, { v: 'landscape', t: 'Landscape' }].forEach((it) => {
+      const opt = document.createElement('option');
+      opt.value = it.v;
+      opt.textContent = it.t;
+      if (it.v === this.orientation) opt.selected = true;
+      orientSel.appendChild(opt);
+    });
+    orientSel.addEventListener('change', () => { this.orientation = orientSel.value || 'portrait'; });
+
+    const styleWrap = controls.createDiv();
+    styleWrap.createEl('div', { text: 'Stile stampa' });
+    const styleLine = styleWrap.createEl('label');
+    styleLine.style.display = 'flex';
+    styleLine.style.alignItems = 'center';
+    styleLine.style.gap = '6px';
+    const styleLineCb = styleLine.createEl('input');
+    styleLineCb.type = 'checkbox';
+    styleLineCb.checked = this.lineOnly;
+    styleLine.createSpan({ text: 'Solo linee (B/N)' });
+    styleLineCb.addEventListener('change', () => {
+      this.lineOnly = styleLineCb.checked;
+      this.renderPreviewGrid();
+    });
+
+    const fitWrap = controls.createDiv();
+    fitWrap.createEl('div', { text: 'Impaginazione' });
+    const fitLbl = fitWrap.createEl('label');
+    fitLbl.style.display = 'flex';
+    fitLbl.style.alignItems = 'center';
+    fitLbl.style.gap = '6px';
+    const fitCb = fitLbl.createEl('input');
+    fitCb.type = 'checkbox';
+    fitCb.checked = this.fitOnePage;
+    fitLbl.createSpan({ text: 'Adatta a 1 pagina' });
+    fitCb.addEventListener('change', () => { this.fitOnePage = fitCb.checked; });
+
+    columnsSel.addEventListener('change', () => {
+      this.columns = Number(columnsSel.value) || 2;
+      this.renderPreviewGrid();
+    });
+    gapInput.addEventListener('input', () => {
+      this.gapMm = Number(gapInput.value) || 0;
+      this.renderPreviewGrid();
+    });
+
+    contentEl.createEl('div', { text: 'Anteprima griglia A4 (trascina i riquadri: header + board si muovono insieme).' });
+    this.previewEl = contentEl.createDiv();
+    this.previewEl.style.maxHeight = '56vh';
+    this.previewEl.style.overflow = 'auto';
+    this.previewEl.style.marginTop = '8px';
+    this.previewEl.style.border = '1px solid var(--background-modifier-border)';
+    this.previewEl.style.borderRadius = '8px';
+    this.previewEl.style.padding = '10px';
+    this.renderPreviewGrid();
+
+    const actions = contentEl.createDiv();
+    actions.style.display = 'flex';
+    actions.style.justifyContent = 'flex-end';
+    actions.style.gap = '8px';
+    actions.style.marginTop = '12px';
+
+    const cancelBtn = actions.createEl('button', { text: 'Annulla' });
+    cancelBtn.addEventListener('click', () => this.close());
+
+    const printBtn = actions.createEl('button', { text: 'Esporta PDF' });
+    printBtn.addClass('mod-cta');
+    printBtn.addEventListener('click', async () => {
+      const payload = {
+        items: this.items,
+        columns: this.columns,
+        gapMm: this.gapMm,
+        marginMm: this.marginMm,
+        orientation: this.orientation,
+        lineOnly: this.lineOnly,
+        fitOnePage: this.fitOnePage,
+      };
+      this.close();
+      await this.onSubmit(payload);
+    });
+  }
+
+  renderPreviewGrid() {
+    if (!this.previewEl) return;
+    this.previewEl.empty();
+
+    const grid = this.previewEl.createDiv();
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = `repeat(${Math.max(1, this.columns)}, minmax(0, 1fr))`;
+    grid.style.gridAutoFlow = 'row';
+    grid.style.gap = `${Math.max(0, this.gapMm * 3)}px`;
+
+    this.items.forEach((item, idx) => {
+      const card = grid.createDiv();
+      card.style.border = '1px solid var(--background-modifier-border)';
+      card.style.borderRadius = '8px';
+      card.style.padding = '8px';
+      card.style.background = 'var(--background-primary)';
+      card.style.display = 'grid';
+      card.style.gap = '6px';
+      card.draggable = true;
+      card.style.opacity = item.enabled === false ? '0.55' : '1';
+
+      const top = card.createDiv();
+      top.style.display = 'grid';
+      top.style.gridTemplateColumns = '20px 1fr auto';
+      top.style.alignItems = 'center';
+      top.style.gap = '6px';
+
+      const include = top.createEl('input');
+      include.type = 'checkbox';
+      include.checked = item.enabled !== false;
+      include.addEventListener('change', () => {
+        item.enabled = include.checked;
+        this.renderPreviewGrid();
+      });
+
+      const label = top.createDiv();
+      const title = item.header ? item.header : `VolleyBoard ${idx + 1}`;
+      label.textContent = `${idx + 1}. ${title}`;
+      label.style.fontWeight = '600';
+      label.style.fontSize = '12px';
+      label.style.whiteSpace = 'nowrap';
+      label.style.overflow = 'hidden';
+      label.style.textOverflow = 'ellipsis';
+
+      const move = top.createDiv({ text: '↕' });
+      move.style.fontSize = '12px';
+      move.style.opacity = '0.7';
+      move.style.textAlign = 'right';
+
+      const board = card.createDiv();
+      board.style.lineHeight = '0';
+      board.style.borderRadius = '6px';
+      board.style.overflow = 'hidden';
+      board.style.border = '1px solid var(--background-modifier-border)';
+      board.innerHTML = item.svg || '';
+      const svgEl = board.querySelector('svg');
+      if (svgEl) {
+        svgEl.style.display = 'block';
+        svgEl.style.width = '100%';
+        svgEl.style.height = 'auto';
+        if (this.lineOnly) applyLineOnlyToSvg(svgEl);
+      }
+
+      card.addEventListener('dragstart', (e) => {
+        this.dragIndex = idx;
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      });
+      card.addEventListener('dragover', (e) => e.preventDefault());
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (this.dragIndex == null || this.dragIndex === idx) return;
+        const moved = this.items.splice(this.dragIndex, 1)[0];
+        this.items.splice(idx, 0, moved);
+        this.dragIndex = null;
+        this.renderPreviewGrid();
+      });
+      card.addEventListener('dragend', () => { this.dragIndex = null; });
+    });
+  }
 }
 
 class VolleyBoardPlugin extends Plugin {
@@ -313,9 +572,305 @@ class VolleyBoardPlugin extends Plugin {
         editor.replaceSelection(md);
       }
     });
+
+    this.addCommand({
+      id: 'export-volleyboard-a4-pdf',
+      name: 'VolleyBoard: Export A4 PDF from current note',
+      callback: async () => {
+        await this.exportVolleyBoardsFromActiveFile();
+      }
+    });
   }
 
   onunload() {}
+
+  async exportVolleyBoardsFromActiveFile() {
+    const file = this.app.workspace.getActiveFile?.();
+    if (!file) {
+      new Notice('VolleyBoard: nessun file attivo.');
+      return;
+    }
+    const text = await this.app.vault.read(file);
+    const blocks = this.extractVolleyboardBlocks(text);
+    if (!blocks.length) {
+      new Notice('VolleyBoard: nessun blocco volleyboard trovato nella nota.');
+      return;
+    }
+    const blocksWithSvg = await this.buildBoardSnapshots(blocks);
+    if (!blocksWithSvg.length) {
+      new Notice('VolleyBoard: impossibile generare l\'anteprima delle board.');
+      return;
+    }
+    const modal = new VolleyBoardPdfModal(this.app, blocksWithSvg, async (config) => {
+      await this.printVolleyBoardsPdf(config, file.basename);
+    });
+    modal.open();
+  }
+
+  extractVolleyboardBlocks(text) {
+    const normalized = String(text || '').replace(/\r\n/g, '\n');
+    const lines = normalized.split('\n');
+    const blocks = [];
+    let i = 0;
+    while (i < lines.length) {
+      if (lines[i].trim() !== '```volleyboard') {
+        i += 1;
+        continue;
+      }
+      const start = i;
+      i += 1;
+      const contentStart = i;
+      while (i < lines.length && lines[i].trim() !== '```') i += 1;
+      const end = Math.min(i, lines.length - 1);
+      const jsonText = lines.slice(contentStart, end).join('\n').trim();
+      const header = this.findHeaderAbove(lines, start);
+      blocks.push({
+        id: `vb_${start}_${end}_${blocks.length}`,
+        header,
+        jsonText,
+      });
+      i += 1;
+    }
+    return blocks;
+  }
+
+  findHeaderAbove(lines, fromLine) {
+    for (let i = fromLine - 1; i >= 0; i -= 1) {
+      const t = String(lines[i] || '').trim();
+      if (!t) continue;
+      const m = t.match(/^(#{1,6})\s+(.+)$/);
+      if (m) return m[2].trim();
+      if (t.startsWith('```')) return '';
+    }
+    return '';
+  }
+
+  async buildBoardSnapshots(items) {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.position = 'absolute';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.srcdoc = buildSrcDoc();
+    document.body.appendChild(iframe);
+    try {
+      const api = await waitForApi(iframe);
+      if (!api) throw new Error('init failed');
+      const out = [];
+      for (const item of items) {
+        if (item.enabled === false) continue;
+        let parsed = null;
+        try {
+          parsed = JSON.parse(item.jsonText || '{}');
+        } catch {
+          continue;
+        }
+        if (!parsed || typeof parsed !== 'object') continue;
+        api.setState(parsed);
+        const svg = api.exportSvg ? api.exportSvg() : '';
+        if (!svg) continue;
+        out.push({
+          ...item,
+          svg: injectSnapshotFont(svg),
+        });
+      }
+      return out;
+    } finally {
+      iframe.remove();
+    }
+  }
+
+  async printVolleyBoardsPdf(config, filenameBase) {
+    const snapshots = (config.items || []).filter((it) => it.enabled !== false && it.svg);
+    if (!snapshots.length) {
+      new Notice('VolleyBoard: nessuna board selezionata.');
+      return;
+    }
+    const html = this.buildPdfHtml(snapshots, config, filenameBase);
+    const directOk = await this.exportPdfDirect(html, config, filenameBase);
+    if (directOk) return;
+    try {
+      await this.printHtmlInIframe(html);
+      new Notice('VolleyBoard: export diretto non disponibile, aperta finestra di stampa.');
+    } catch (e) {
+      console.error(e);
+      new Notice('VolleyBoard: impossibile aprire la stampa.');
+    }
+  }
+
+  buildPdfHtml(snapshots, config, filenameBase) {
+    const columns = Math.max(1, Math.min(4, Number(config.columns) || 2));
+    const gapMm = Math.max(0, Math.min(30, Number(config.gapMm) || 0));
+    const marginMm = Math.max(0, Math.min(30, Number(config.marginMm) || 0));
+    const orientation = String(config.orientation || 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+    const lineOnly = !!config.lineOnly;
+    const fitOnePage = config.fitOnePage !== false;
+    const pageHeightMm = orientation === 'landscape' ? 210 : 297;
+    const rows = Math.max(1, Math.ceil(snapshots.length / columns));
+    const metaMm = 10;
+    const usableHeightMm = Math.max(20, pageHeightMm - (marginMm * 2) - metaMm);
+    const rowHeightMm = Math.max(10, ((usableHeightMm - (gapMm * (rows - 1))) / rows) * 0.96);
+    const now = new Date().toLocaleString();
+    const cards = snapshots.map((item, idx) => {
+      const title = escapeHtml(item.header || `VolleyBoard ${idx + 1}`);
+      return `<article class="card"><h3>${title}</h3><div class="board">${item.svg}</div></article>`;
+    }).join('\n');
+    const lineOnlyCss = lineOnly ? `
+    .board svg [fill]:not([fill="none"]):not([data-arrow-head="1"]):not(.vb-player-base) { fill: none !important; }
+    .board svg [stroke] { stroke: #111 !important; }
+    .board svg [data-arrow-head="1"] { fill: #111 !important; stroke: none !important; }
+    .board svg .vb-player-base { fill: #fff !important; stroke: #111 !important; }
+    .board svg [data-team="B"] [stroke] { stroke: #666 !important; }
+    .board svg [data-team="B"] [data-arrow-head="1"] { fill: #666 !important; stroke: none !important; }
+    .board svg [data-team="B"] text, .board svg [data-team="B"] tspan { fill: #666 !important; }
+    .board svg [data-team="B"] .vb-player-base { fill: #fff !important; stroke: #666 !important; }
+    .board svg text, .board svg tspan {
+      fill: #111 !important;
+      stroke: none !important;
+    }` : '';
+    const fitCss = fitOnePage ? `
+    body { height: ${Math.max(20, usableHeightMm + metaMm)}mm; overflow: hidden; }
+    .meta { margin: 0 0 2mm 0; }
+    .grid { max-height: ${Math.max(10, usableHeightMm)}mm; overflow: hidden; grid-auto-rows: ${rowHeightMm}mm; }
+    .card { height: ${rowHeightMm}mm; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+    .board { min-height: 0; }
+    .board svg { width: 100% !important; height: 100% !important; object-fit: contain; }` : '';
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(filenameBase || 'volleyboard')} - PDF</title>
+  <style>
+    @page { size: A4 ${orientation}; margin: ${marginMm}mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #111; font-family: "Inter", "Segoe UI", Arial, sans-serif; }
+    .meta { margin: 0 0 5mm 0; font-size: 11px; color: #666; }
+    .grid { display: grid; grid-template-columns: repeat(${columns}, minmax(0, 1fr)); grid-auto-flow: row; gap: ${gapMm}mm; align-items: start; }
+    .card { break-inside: avoid; border: 1px solid #d9d9d9; border-radius: 8px; padding: 3mm; }
+    .card h3 { margin: 0 0 2mm 0; font-size: 12px; line-height: 1.2; }
+    .board { width: 100%; line-height: 0; }
+    .board svg { width: 100% !important; height: auto !important; display: block; }
+    .board text, .board tspan {
+      font-family: "Excalifont","Comic Sans MS","Marker Felt","Bradley Hand","Segoe Print",cursive !important;
+    }
+    ${lineOnlyCss}
+    ${fitCss}
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <p class="meta">${escapeHtml(filenameBase || 'Nota')} · ${escapeHtml(now)}</p>
+  <section class="grid">${cards}</section>
+</body>
+</html>`;
+  }
+
+  async exportPdfDirect(html, config, filenameBase) {
+    try {
+      let remote = null;
+      try { remote = require('@electron/remote'); } catch {}
+      if (!remote || !remote.BrowserWindow || !remote.dialog) return false;
+
+      const BrowserWindow = remote.BrowserWindow;
+      const dialog = remote.dialog;
+      const win = new BrowserWindow({
+        show: false,
+        width: 1280,
+        height: 900,
+        webPreferences: {
+          sandbox: false,
+          contextIsolation: false,
+          nodeIntegration: false,
+        },
+      });
+      try {
+        await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+        const pdfBuffer = await win.webContents.printToPDF({
+          pageSize: 'A4',
+          landscape: String(config.orientation || 'portrait') === 'landscape',
+          printBackground: !config.lineOnly,
+          marginsType: 1,
+          preferCSSPageSize: true,
+        });
+        const active = this.app.workspace.getActiveFile?.();
+        const base = String(filenameBase || 'volleyboard').trim() || 'volleyboard';
+        const defaultName = `${base}.pdf`;
+        let defaultPath = defaultName;
+        try {
+          const root = this.app.vault.adapter.getBasePath?.();
+          if (root) {
+            const folder = active?.parent?.path || '';
+            defaultPath = path.join(root, folder, defaultName);
+          }
+        } catch {}
+        const saveRes = await dialog.showSaveDialog(remote.getCurrentWindow?.(), {
+          title: 'Salva PDF VolleyBoard',
+          defaultPath,
+          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+          properties: ['showOverwriteConfirmation'],
+        });
+        if (saveRes?.canceled || !saveRes?.filePath) return true;
+        fs.writeFileSync(saveRes.filePath, pdfBuffer);
+        new Notice(`VolleyBoard: PDF salvato in ${saveRes.filePath}`);
+        return true;
+      } finally {
+        win.destroy();
+      }
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  }
+
+  async printHtmlInIframe(html) {
+    await new Promise((resolve, reject) => {
+      const frame = document.createElement('iframe');
+      frame.style.position = 'fixed';
+      frame.style.right = '0';
+      frame.style.bottom = '0';
+      frame.style.width = '1px';
+      frame.style.height = '1px';
+      frame.style.opacity = '0';
+      frame.style.pointerEvents = 'none';
+      const cleanup = () => {
+        if (frame.parentNode) frame.parentNode.removeChild(frame);
+      };
+      frame.onload = () => {
+        setTimeout(() => {
+          try {
+            const w = frame.contentWindow;
+            if (!w) throw new Error('print frame unavailable');
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              cleanup();
+              resolve();
+            };
+            w.onafterprint = finish;
+            w.focus();
+            w.print();
+            setTimeout(finish, 1200);
+          } catch (err) {
+            cleanup();
+            reject(err);
+          }
+        }, 200);
+      };
+      try {
+        frame.srcdoc = html;
+        document.body.appendChild(frame);
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    });
+  }
 
   async persistState(ctx, originalSource, nextState, opts = {}) {
     const file = ctx.sourcePath ? this.app.vault.getAbstractFileByPath(ctx.sourcePath) : null;
