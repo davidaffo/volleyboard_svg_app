@@ -421,6 +421,14 @@
 
   const EMBEDDED = !!window.VOLLEY_EMBED;
   const changeListeners = new Set();
+  const browserStore = (() => {
+    if (EMBEDDED) return null;
+    try {
+      return window['local' + 'Storage'] || null;
+    } catch {
+      return null;
+    }
+  })();
 
   function emitChange() {
     if (!changeListeners.size) return;
@@ -543,8 +551,8 @@
     currentLang = lang;
     document.documentElement.lang = lang;
     document.title = t('app.title');
-    if (persist) {
-      try { localStorage.setItem(LANG_KEY, lang); } catch {}
+    if (persist && browserStore) {
+      try { browserStore.setItem(LANG_KEY, lang); } catch {}
     }
     applyI18n();
     buildLangOptions();
@@ -556,7 +564,9 @@
 
   function initLang() {
     let saved = null;
-    try { saved = localStorage.getItem(LANG_KEY); } catch {}
+    if (browserStore) {
+      try { saved = browserStore.getItem(LANG_KEY); } catch {}
+    }
     const initial = saved && I18N[saved] ? saved : DEFAULT_LANG;
     buildLangOptions();
     if (langSelect) {
@@ -2573,7 +2583,11 @@
     ioText.value = JSON.stringify(serializeState(), null, 2);
     btnIOMain.onclick = async (e) => {
       e.preventDefault();
-      try { await navigator.clipboard.writeText(ioText.value); } catch {}
+      try {
+        ioText.focus();
+        ioText.select();
+        document.execCommand('copy');
+      } catch {}
       dlgIO.close();
     };
     dlgIO.showModal();
@@ -3696,14 +3710,16 @@
     }
   }, true);
 
-  // Save/load to localStorage for web usage
+  // Save/load to browser storage for web usage
   const LS_KEY = 'volleyboard_state_v1';
   function saveLocal() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
+    if (!browserStore) return;
+    try { browserStore.setItem(LS_KEY, JSON.stringify(state)); } catch {}
   }
   function loadLocal() {
+    if (!browserStore) return false;
     try {
-      const raw = localStorage.getItem(LS_KEY);
+      const raw = browserStore.getItem(LS_KEY);
       if (!raw) return false;
       replaceState(JSON.parse(raw));
       return true;

@@ -3,9 +3,7 @@
   Source of truth: docs/index.html, docs/style.css, docs/app.js
   Regenerate with: node scripts/sync-plugin.js
 */
-const { Plugin, Notice, Modal } = require('obsidian');
-const fs = require('fs');
-const path = require('path');
+const { Plugin, Notice, Modal, normalizePath } = require('obsidian');
 
 const WEB_HTML = __WEB_HTML__;
 const WEB_CSS = __WEB_CSS__;
@@ -15,13 +13,7 @@ const EXCALIFONT_DATA_URI = (() => {
     const fromCss = WEB_CSS.match(/src:\s*url\((['"]?)(data:font\/woff2;base64,[^)"']+)\1\)\s*format\(['"]woff2['"]\)/i);
     if (fromCss && fromCss[2]) return fromCss[2];
   } catch {}
-  try {
-    const fontPath = path.join(__dirname, 'assets', 'Excalifont-Regular.woff2');
-    const raw = fs.readFileSync(fontPath);
-    return `data:font/woff2;base64,${raw.toString('base64')}`;
-  } catch {
-    return '';
-  }
+  return '';
 })();
 
 function buildSrcDoc() {
@@ -82,6 +74,30 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function sanitizePdfName(value) {
+  const base = String(value || 'volleyboard').trim() || 'volleyboard';
+  return base.replace(/[\\/:*?"<>|#^[\]]+/g, '-').replace(/\s+/g, ' ').slice(0, 120);
+}
+
+function pdfBufferToArrayBuffer(buffer) {
+  if (buffer instanceof ArrayBuffer) return buffer;
+  const view = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
+}
+
+async function nextAvailableVaultPath(app, folder, filename) {
+  const safeFolder = folder ? normalizePath(folder) : '';
+  const dot = filename.toLowerCase().endsWith('.pdf') ? filename.length - 4 : filename.length;
+  const stem = filename.slice(0, dot);
+  const ext = filename.slice(dot) || '.pdf';
+  for (let idx = 0; idx < 1000; idx += 1) {
+    const name = idx === 0 ? `${stem}${ext}` : `${stem} ${idx + 1}${ext}`;
+    const candidate = normalizePath(safeFolder ? `${safeFolder}/${name}` : name);
+    if (!(await app.vault.adapter.exists(candidate))) return candidate;
+  }
+  return normalizePath(safeFolder ? `${safeFolder}/${stem}-${Date.now()}${ext}` : `${stem}-${Date.now()}${ext}`);
 }
 
 function applyLineOnlyToSvg(svgEl) {
@@ -774,10 +790,9 @@ class VolleyBoardPlugin extends Plugin {
     try {
       let remote = null;
       try { remote = require('@electron/remote'); } catch {}
-      if (!remote || !remote.BrowserWindow || !remote.dialog) return false;
+      if (!remote || !remote.BrowserWindow) return false;
 
       const BrowserWindow = remote.BrowserWindow;
-      const dialog = remote.dialog;
       const win = new BrowserWindow({
         show: false,
         width: 1280,
@@ -798,25 +813,11 @@ class VolleyBoardPlugin extends Plugin {
           preferCSSPageSize: true,
         });
         const active = this.app.workspace.getActiveFile?.();
-        const base = String(filenameBase || 'volleyboard').trim() || 'volleyboard';
-        const defaultName = `${base}.pdf`;
-        let defaultPath = defaultName;
-        try {
-          const root = this.app.vault.adapter.getBasePath?.();
-          if (root) {
-            const folder = active?.parent?.path || '';
-            defaultPath = path.join(root, folder, defaultName);
-          }
-        } catch {}
-        const saveRes = await dialog.showSaveDialog(remote.getCurrentWindow?.(), {
-          title: 'Salva PDF VolleyBoard',
-          defaultPath,
-          filters: [{ name: 'PDF', extensions: ['pdf'] }],
-          properties: ['showOverwriteConfirmation'],
-        });
-        if (saveRes?.canceled || !saveRes?.filePath) return true;
-        fs.writeFileSync(saveRes.filePath, pdfBuffer);
-        new Notice(`VolleyBoard: PDF salvato in ${saveRes.filePath}`);
+        const folder = active?.parent?.path || '';
+        const defaultName = `${sanitizePdfName(filenameBase)}.pdf`;
+        const vaultPath = await nextAvailableVaultPath(this.app, folder, defaultName);
+        await this.app.vault.adapter.writeBinary(vaultPath, pdfBufferToArrayBuffer(pdfBuffer));
+        new Notice(`VolleyBoard: PDF salvato in ${vaultPath}`);
         return true;
       } finally {
         win.destroy();
