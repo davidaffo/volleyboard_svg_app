@@ -469,6 +469,14 @@
     CIRCLE: 'circle',
     PAN: 'pan',
   };
+  let toolLocked = false;
+  const drawingTools = [
+    ['#btnArrow', MODE.ARROW],
+    ['#btnFreehand', MODE.FREEHAND],
+    ['#btnRect', MODE.RECT],
+    ['#btnCircle', MODE.CIRCLE],
+    ['#btnText', MODE.TEXT],
+  ];
 
   let state = DEFAULT_STATE();
   state.layoutStates = {};
@@ -1906,6 +1914,14 @@
       : (m === MODE.RECT ? t('mode.rect')
       : (m === MODE.CIRCLE ? t('mode.circle') : t('mode.pan'))))));
     chipMode.textContent = t('mode.label', { label });
+    for (const [selector, mode] of drawingTools) {
+      const button = $(selector);
+      const active = m === mode;
+      button?.classList.toggle('isActive', active);
+      button?.classList.toggle('isLocked', active && toolLocked);
+      button?.setAttribute('aria-pressed', String(active));
+    }
+    $('#btnSelectMode')?.setAttribute('aria-pressed', String(m === MODE.SELECT));
   }
 
   function commit() {
@@ -1970,6 +1986,7 @@
     const clampedX = clamp(x, bounds.minX ?? 0, bounds.maxX);
     const clampedY = clamp(y, bounds.minY ?? 0, bounds.maxY);
     state.objects.push({ id: ID(), type:'player', team, x: clampedX, y: clampedY, role, label });
+    finishTool();
     commit();
   }
 
@@ -2064,6 +2081,7 @@
     const clampedX = clamp(x, bounds.minX ?? 0, bounds.maxX);
     const clampedY = clamp(y, bounds.minY ?? 0, bounds.maxY);
     state.props.push({ id: ID(), type:'prop', kind, x: clampedX, y: clampedY, role: opts.role, color: opts.color });
+    finishTool();
     commit();
   }
 
@@ -2324,9 +2342,14 @@
   // Modes and actions
   state.mode = MODE.SELECT;
 
-  function setMode(m) {
+  function setMode(m, locked = false) {
     state.mode = m;
+    toolLocked = locked;
     render();
+  }
+
+  function finishTool() {
+    if (!toolLocked) setMode(MODE.SELECT);
   }
 
   // Toolbar buttons
@@ -2342,25 +2365,18 @@
   });
 
 
-  $('#btnArrow')?.addEventListener('click', () => {
-    setMode(state.mode === MODE.ARROW ? MODE.SELECT : MODE.ARROW);
-  });
-
-  $('#btnFreehand')?.addEventListener('click', () => {
-    setMode(state.mode === MODE.FREEHAND ? MODE.SELECT : MODE.FREEHAND);
-  });
-
-  $('#btnRect')?.addEventListener('click', () => {
-    setMode(state.mode === MODE.RECT ? MODE.SELECT : MODE.RECT);
-  });
-
-  $('#btnCircle')?.addEventListener('click', () => {
-    setMode(state.mode === MODE.CIRCLE ? MODE.SELECT : MODE.CIRCLE);
-  });
-
-  $('#btnText')?.addEventListener('click', () => {
-    setMode(state.mode === MODE.TEXT ? MODE.SELECT : MODE.TEXT);
-  });
+  for (const [selector, mode] of drawingTools) {
+    const button = $(selector);
+    button?.addEventListener('click', (event) => {
+      // The second click of a double click must not toggle the tool off.
+      if (event.detail > 1) return;
+      setMode(state.mode === mode ? MODE.SELECT : mode);
+    });
+    button?.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      setMode(mode, true);
+    });
+  }
 
   $('#btnSelectMode')?.addEventListener('click', () => {
     setMode(MODE.SELECT);
@@ -3213,7 +3229,8 @@
     if (mode === MODE.TEXT) {
       cancelLongPress();
       addTextAt(pt.x, pt.y, t('default.text'), 'A');
-      setMode(MODE.SELECT);
+      setSelection(state.texts[state.texts.length - 1].id);
+      finishTool();
       return;
     }
 
@@ -3539,6 +3556,7 @@
           style:{ width: String(arrowDraft.width ?? 0.08), opacity:'0.9', dash: arrowDraft.dash || 'solid' },
         });
         setSelection(state.drawings[state.drawings.length - 1].id);
+        finishTool();
         commit();
       } else {
         render();
@@ -3554,6 +3572,7 @@
         const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
         state.drawings.push({ id: ID(), type:'freehand', path: d, style:{ width: String(freehandDraft.width ?? 0.08), opacity:'0.9', color: freehandDraft.color } });
         setSelection(state.drawings[state.drawings.length - 1].id);
+        finishTool();
         commit();
       } else {
         render();
@@ -3583,6 +3602,7 @@
         }
         state.drawings.push({ id: ID(), type: shapeDraft.kind, path: d, style:{ width: String(shapeDraft.width ?? 0.08), opacity:'0.9', color: shapeDraft.color } });
         setSelection(state.drawings[state.drawings.length - 1].id);
+        finishTool();
         commit();
       } else {
         render();

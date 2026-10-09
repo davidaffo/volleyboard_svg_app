@@ -98,6 +98,8 @@ body{
   touch-action:manipulation;
 }
 .btn:active{transform: translateY(1px)}
+.btn.isActive{border-color:var(--accent);background:var(--btn2)}
+.btn.isLocked{border-color:#facc15;outline:2px solid #facc15;outline-offset:2px}
 .btnPrimary{border-color: rgba(94,234,212,.25)}
 .btnDanger{border-color: rgba(239,68,68,.25)}
 .main{
