@@ -353,6 +353,8 @@ class VolleyBoardPdfModal extends Modal {
 class VolleyBoardPlugin extends Plugin {
   async onload() {
     this.registerMarkdownCodeBlockProcessor('volleyboard', async (source, el, ctx) => {
+      const sectionInfo = ctx.getSectionInfo?.(el);
+      let blockLineStart = (sectionInfo && typeof sectionInfo.lineStart === 'number') ? sectionInfo.lineStart : null;
       el.empty();
       const wrapper = el.createDiv({ cls: 'vb-obsidian-wrapper' });
       const style = document.createElement('style');
@@ -415,8 +417,6 @@ class VolleyBoardPlugin extends Plugin {
       let editorOpen = false;
       let editorIframe = null;
       let editorLeaf = null;
-      const sectionInfo = ctx.getSectionInfo?.(ctx.el);
-      const blockLineStart = (sectionInfo && typeof sectionInfo.lineStart === 'number') ? sectionInfo.lineStart : null;
       const ensureBlockId = () => {
         if (!parsed) return null;
         if (!parsed.meta) parsed.meta = { createdAt: new Date().toISOString() };
@@ -430,22 +430,15 @@ class VolleyBoardPlugin extends Plugin {
       const refreshSourceText = (state) => {
         try { sourceText = JSON.stringify(state, null, 2); } catch {}
       };
-      const persistSafe = async (nextState, strict = false) => {
-        try {
-          await this.persistState(ctx, sourceText, nextState, { blockLineStart, blockId, strict });
-          refreshSourceText(nextState);
-          return;
-        } catch (err) {
-          if (!strict || !String(err?.message || '').includes('blockId not found')) throw err;
-        }
-        // Retry once: write with lineStart (if blockId missing), then strict save.
-        await this.persistState(ctx, sourceText, nextState, { blockLineStart, forceLineStart: true });
-        refreshSourceText(nextState);
-        await this.persistState(ctx, sourceText, nextState, { blockLineStart, blockId, strict: true });
+      const persistSafe = async (nextState) => {
+        nextState.meta = { ...nextState.meta, blockId };
+        await this.persistState(ctx, sourceText, nextState, { blockLineStart, blockId });
         refreshSourceText(nextState);
       };
       const openEditor = async () => {
         if (editorOpen) return;
+        const currentSection = ctx.getSectionInfo?.(el);
+        if (typeof currentSection?.lineStart === 'number') blockLineStart = currentSection.lineStart;
         editorOpen = true;
         snap.style.display = 'none';
 
@@ -508,17 +501,21 @@ class VolleyBoardPlugin extends Plugin {
         btnSaveClose = document.createElement('button');
         btnSaveClose.textContent = 'Salva e chiudi';
         btnSaveClose.addEventListener('click', async () => {
+          if (btnSaveClose.disabled) return;
+          btnSaveClose.disabled = true;
           try {
             const latest = api.getState ? api.getState() : draftState;
             savedState = latest;
             parsed = savedState;
           } catch {}
           try {
-            await persistSafe(savedState, false);
+            await persistSafe(savedState);
             setDirty(false);
           } catch (e) {
             console.error(e);
-            new Notice('VolleyBoard: impossibile salvare (vedi console)');
+            new Notice('VolleyBoard: impossibile salvare: ' + e.message);
+            btnSaveClose.disabled = false;
+            return;
           }
           if (editorIframe) editorIframe.remove();
           controls.remove();
@@ -573,7 +570,7 @@ class VolleyBoardPlugin extends Plugin {
       editorCallback: (editor) => {
         const block = {
           version: 1,
-          meta: { createdAt: new Date().toISOString() },
+          meta: { createdAt: new Date().toISOString(), blockId: `vb_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}` },
           layout: 'full-h',
           rotation: 0,
           view: { x: -2, y: -2, w: 22, h: 13 },
@@ -877,120 +874,89 @@ class VolleyBoardPlugin extends Plugin {
     const file = ctx.sourcePath ? this.app.vault.getAbstractFileByPath(ctx.sourcePath) : null;
     if (!file) throw new Error('No file from context');
 
-    const text = await this.app.vault.read(file);
-    const normalizedText = text.replace(/\r\n/g, '\n');
-    const replacement = '```volleyboard\n' + JSON.stringify(nextState, null, 2) + '\n```';
-    const stableStringify = (value) => {
-      if (value === null || typeof value !== 'object') return JSON.stringify(value);
-      if (Array.isArray(value)) return '[' + value.map((v) => stableStringify(v)).join(',') + ']';
-      const keys = Object.keys(value).sort();
-      return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
-    };
-    const normalizeJsonForMatch = (jsonText) => {
-      try {
-        const obj = JSON.parse(jsonText);
-        if (obj && typeof obj === 'object' && obj.meta && typeof obj.meta === 'object') {
-          const next = { ...obj, meta: { ...obj.meta } };
-          delete next.meta.blockId;
-          return stableStringify(next);
+    const updateText = (text) => {
+      const normalizedText = text.replace(/\r\n/g, '\n');
+      const replacement = '```volleyboard\n' + JSON.stringify(nextState, null, 2) + '\n```';
+      const stableStringify = (value) => {
+        if (value === null || typeof value !== 'object') return JSON.stringify(value);
+        if (Array.isArray(value)) return '[' + value.map((v) => stableStringify(v)).join(',') + ']';
+        const keys = Object.keys(value).sort();
+        return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
+      };
+      const normalizeJsonForMatch = (jsonText) => {
+        try {
+          const obj = JSON.parse(jsonText);
+          if (obj && typeof obj === 'object' && obj.meta && typeof obj.meta === 'object') {
+            const next = { ...obj, meta: { ...obj.meta } };
+            delete next.meta.blockId;
+            return stableStringify(next);
+          }
+          return stableStringify(obj);
+        } catch {
+          return null;
         }
-        return stableStringify(obj);
-      } catch {
-        return null;
-      }
-    };
+      };
 
-    const section = ctx.getSectionInfo?.(ctx.el);
-    if (typeof opts?.blockLineStart !== 'number') {
-      const lineStart = (section && typeof section.lineStart === 'number') ? section.lineStart : null;
-      if (typeof lineStart === 'number') opts.blockLineStart = lineStart;
-    }
-    {
-      const lines = normalizedText.split('\n');
-      const blocks = [];
-      let i = 0;
-      while (i < lines.length) {
-        const openLine = lines[i];
-        const openTrim = openLine.trim();
-        if (openTrim === '```volleyboard') {
-          const start = i;
-          const indent = openLine.match(/^(\s*)/)?.[1] ?? '';
+      {
+        const lines = normalizedText.split('\n');
+        const blocks = [];
+        let i = 0;
+        while (i < lines.length) {
+          const openLine = lines[i];
+          const openTrim = openLine.trim();
+          if (openTrim === '```volleyboard') {
+            const start = i;
+            const indent = openLine.match(/^(\s*)/)?.[1] ?? '';
+            i += 1;
+            const contentStart = i;
+            while (i < lines.length && lines[i].trim() !== '```') i += 1;
+            if (i >= lines.length) break;
+            const end = i;
+            const content = lines.slice(contentStart, end).map((line) => {
+              if (indent && line.startsWith(indent)) return line.slice(indent.length);
+              return line;
+            }).join('\n').trim();
+            let parsedId = null;
+            let parsedNorm = null;
+            try {
+              const parsedObj = JSON.parse(content);
+              parsedId = parsedObj?.meta?.blockId ?? null;
+              parsedNorm = normalizeJsonForMatch(content);
+            } catch {}
+            blocks.push({ start, end, content, indent, parsedId, parsedNorm });
+          }
           i += 1;
-          const contentStart = i;
-          while (i < lines.length && lines[i].trim() !== '```') i += 1;
-          const end = Math.min(i, lines.length - 1);
-          const content = lines.slice(contentStart, end).map((line) => {
-            if (indent && line.startsWith(indent)) return line.slice(indent.length);
-            return line;
-          }).join('\n').trim();
-          let parsedId = null;
-          let parsedNorm = null;
-          try {
-            const parsedObj = JSON.parse(content);
-            parsedId = parsedObj?.meta?.blockId ?? null;
-            parsedNorm = normalizeJsonForMatch(content);
-          } catch {}
-          blocks.push({ start, end, content, indent, parsedId, parsedNorm });
         }
-        i += 1;
-      }
-      let match = null;
-      const blockId = opts?.blockId;
-      const originalNorm = normalizeJsonForMatch(originalSource || '');
-      if (blockId) {
-        for (const b of blocks) {
-          if (b.parsedId === blockId) { match = b; break; }
-        }
-        if (!match && opts?.strict && typeof opts?.blockLineStart === 'number') {
-          const line = opts.blockLineStart;
-          const candidate = blocks.find((b) => line >= b.start && line <= b.end);
-          if (candidate) {
-            const candidateId = candidate.parsedId;
-            if (candidateId && candidateId !== blockId) {
-              throw new Error('VolleyBoard: blockId not found');
-            }
-            match = candidate;
+        let match = null;
+        const blockId = opts?.blockId;
+        const originalNorm = normalizeJsonForMatch(originalSource || '');
+        const atLine = (b) => typeof opts.blockLineStart === 'number'
+          && opts.blockLineStart >= b.start && opts.blockLineStart <= b.end;
+        if (blockId) {
+          const identified = blocks.filter((b) => b.parsedId === blockId);
+          if (identified.length === 1) match = identified[0];
+          // Copied boards can share an ID; require content and position to distinguish them.
+          if (identified.length > 1) {
+            const candidates = identified.filter((b) => originalNorm && b.parsedNorm === originalNorm);
+            match = candidates.length === 1 ? candidates[0] : candidates.find(atLine);
+            if (!match) throw new Error('Blocco ambiguo: riapri la volleyboard dalla nota.');
           }
         }
-        if (!match && opts?.strict) {
-          const candidate = originalNorm ? blocks.find((b) => b.parsedNorm && b.parsedNorm === originalNorm) : null;
-          if (candidate) {
-            const candidateId = candidate.parsedId;
-            if (candidateId && candidateId !== blockId) {
-              throw new Error('VolleyBoard: blockId not found');
-            }
-            match = candidate;
-          }
+        if (!match) {
+          // A line number is only a hint: it can shift while the editor is open.
+          const candidates = blocks.filter((b) => originalNorm && b.parsedNorm === originalNorm
+            && (!blockId || !b.parsedId || b.parsedId === blockId));
+          match = candidates.length === 1 ? candidates[0] : candidates.find(atLine);
         }
-        if (!match && opts?.strict) throw new Error('VolleyBoard: blockId not found');
+        if (match) {
+          const replLines = replacement.split('\n').map((line) => (match.indent ? `${match.indent}${line}` : line));
+          lines.splice(match.start, match.end - match.start + 1, ...replLines);
+          return lines.join(text.includes('\r\n') ? '\r\n' : '\n');
+        }
       }
-      if (!match && opts?.forceLineStart && typeof opts?.blockLineStart === 'number') {
-        const line = opts.blockLineStart;
-        match = blocks.find((b) => line >= b.start && line <= b.end);
-        if (!match && opts?.strict) throw new Error('VolleyBoard: block line not found');
-      }
-      if (!match && typeof opts?.blockLineStart === 'number') {
-        const line = opts.blockLineStart;
-        match = blocks.find((b) => line >= b.start && line <= b.end);
-      }
-      if (!match && !opts?.strict) {
-        const norm = (s) => (s || '').trim();
-        const target = norm(originalSource);
-        match = blocks.find((b) => norm(b.content) === target);
-      }
-      if (match) {
-        const replLines = replacement.split('\n').map((line) => (match.indent ? `${match.indent}${line}` : line));
-        lines.splice(match.start, match.end - match.start + 1, ...replLines);
-        await this.app.vault.modify(file, lines.join('\n'));
-        return;
-      }
-    }
-
-    const re = /```volleyboard\s*([\s\S]*?)```/m;
-    const m = text.match(re);
-    if (!m) throw new Error('No volleyboard block found');
-    const nextText = text.replace(re, replacement);
-    await this.app.vault.modify(file, nextText);
+      throw new Error('Blocco non trovato o ambiguo: riapri la volleyboard dalla nota.');
+    };
+    await this.app.vault.process(file, updateText);
   }
 }
 
