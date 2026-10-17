@@ -76,10 +76,7 @@
       'placeholder.notes': 'Free notes (saved in state)...',
       'panel.state.title': 'State',
       'state.objects': 'Objects',
-      'state.layers': 'Layers',
-      'state.layers.value': 'Players • Ball • Drawings • Text',
-      'state.format': 'Format',
-      'state.format.value': 'SVG + JSON',
+      'state.players': 'Players',
       'dialog.io.title': 'Import/Export',
       'dialog.close': 'Close',
       'dialog.ok': 'OK',
@@ -236,10 +233,7 @@
       'placeholder.notes': 'Annotazioni libere (salvate nello stato)...',
       'panel.state.title': 'Stato',
       'state.objects': 'Oggetti',
-      'state.layers': 'Layer',
-      'state.layers.value': 'Giocatori • Palla • Disegni • Testo',
-      'state.format': 'Formato',
-      'state.format.value': 'SVG + JSON',
+      'state.players': 'Giocatori',
       'dialog.io.title': 'Import/Export',
       'dialog.close': 'Chiudi',
       'dialog.ok': 'OK',
@@ -490,6 +484,7 @@
   const inspectorHandle = $('#inspectorHandle');
   const notesEl = $('#notes');
   const statObjects = $('#statObjects');
+  const statPlayers = $('#statPlayers');
   const chipMode = $('#chipMode');
   const toolGrid = $('#toolGrid');
   const toolTeamToggle = $('#toolTeamToggle');
@@ -1885,6 +1880,7 @@
 
   function renderStats() {
     statObjects.textContent = String(state.objects.length + state.drawings.length + state.texts.length + state.props.length);
+    statPlayers.textContent = String(state.objects.filter(o => o.type === 'player').length);
   }
 
   function render() {
